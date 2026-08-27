@@ -1,0 +1,19 @@
+title: "Hello World"
+difficulty: easy
+time_limit_sec: 5
+memory_limit_mb: 128
+
+# Visible test cases (by filename prefix)
+visible_tests: ["01"]
+# Test 02 is hidden — student sees only pass/fail
+
+starter_code:
+  java: |
+    import java.util.Scanner;
+
+    public class Solution {
+        public static void main(String[] args) {
+            Scanner sc = new Scanner(System.in);
+            // Your code here
+        }
+    }
