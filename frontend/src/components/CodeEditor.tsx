@@ -10,6 +10,9 @@
  * - Call onChange with editor content on each change
  */
 
+import Editor from '@monaco-editor/react'
+import { useTheme } from '../context/ThemeContext'
+
 interface CodeEditorProps {
   value: string
   onChange: (value: string) => void
@@ -17,14 +20,31 @@ interface CodeEditorProps {
 }
 
 export default function CodeEditor({ value, onChange, language = 'java' }: CodeEditorProps) {
-  // TODO Phase B2: replace with @monaco-editor/react <Editor /> component
+  const { theme } = useTheme()
+
   return (
-    <textarea
-      className="w-full h-full bg-gray-900 text-gray-100 font-mono text-sm p-4 resize-none outline-none"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={`// Write your ${language} solution here`}
-      spellCheck={false}
-    />
+    <div className="w-full h-full bg-white dark:bg-zinc-950">
+      <Editor
+        height="100%"
+        language={language}
+        theme={theme === 'dark' ? 'vs-dark' : 'light'}
+        value={value}
+        onChange={(val) => onChange(val || '')}
+        options={{
+          fontSize: 14,
+          minimap: { enabled: false },
+          lineNumbers: 'on',
+          automaticLayout: true,
+          scrollBeyondLastLine: false,
+          padding: { top: 12, bottom: 12 },
+          scrollbar: {
+            vertical: 'visible',
+            horizontal: 'visible',
+            verticalScrollbarSize: 8,
+            horizontalScrollbarSize: 8,
+          },
+        }}
+      />
+    </div>
   )
 }
