@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # ── Import all models so Alembic can detect them ────────────────────────────
 from app.db import Base
-# Developer A: import your models here so Alembic can detect schema changes:
-# from app.models.problem import Problem
-# from app.models.test_case import TestCase
-# from app.models.submission import Submission
+from app.models.problem import Problem  # noqa: F401
+from app.models.test_case import TestCase  # noqa: F401
+from app.models.submission import Submission  # noqa: F401
+
 
 from app.config import settings
 

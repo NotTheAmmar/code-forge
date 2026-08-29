@@ -17,6 +17,7 @@ A browser-based competitive programming judge — open a problem, write Java cod
 | ORM | SQLAlchemy 2.0 + Alembic |
 | Sandbox | Docker (`docker-py`) |
 | Reverse Proxy | Nginx |
+| Monitoring | Prometheus + Grafana + cAdvisor |
 
 ---
 
@@ -24,17 +25,17 @@ A browser-based competitive programming judge — open a problem, write Java cod
 
 ### Prerequisites
 - Docker 24+ and Docker Compose v2
-- Node 20+ (for local frontend dev)
-- Python 3.12+ (for local backend dev)
+- Git
 
-### 1. Configure environment
+### 1. Clone and configure
 
 ```bash
+git clone <repo-url> code-forge
+cd code-forge
 cp .env.example .env
-# Edit .env with your settings (defaults work for local dev)
 ```
 
-### 2. Build sandbox images (one-time)
+### 2. Build the Java sandbox image *(one-time)*
 
 ```bash
 docker build -t codeforge-sandbox-java ./sandbox/java
@@ -46,13 +47,13 @@ docker build -t codeforge-sandbox-java ./sandbox/java
 docker compose up -d --build
 ```
 
-### 4. Run database migrations
+### 4. Run database migrations *(one-time)*
 
 ```bash
 docker compose exec api alembic upgrade head
 ```
 
-### 5. Load sample problems
+### 5. Load sample problems *(one-time)*
 
 ```bash
 docker compose exec api python manage.py load-problems ./problems/
@@ -64,15 +65,16 @@ docker compose exec api python manage.py load-problems ./problems/
 |---|---|
 | App | http://localhost |
 | API Docs (Swagger) | http://localhost:8000/docs |
-| Grafana | http://localhost:3000 |
+| Grafana | http://localhost:3000 (admin/admin) |
 | Prometheus | http://localhost:9090 |
+| cAdvisor | http://localhost:8080 |
 
 ---
 
 ## Project Structure
 
 ```
-codeforge/
+code-forge/
 ├── docker-compose.yml
 ├── .env.example
 ├── frontend/          # React + Vite frontend
@@ -83,7 +85,11 @@ codeforge/
 │   ├── hello-world/
 │   ├── two-sum/
 │   └── fizzbuzz/
-└── monitoring/        # Prometheus + Grafana config
+├── monitoring/        # Prometheus + Grafana config
+└── artifiacts/        # Project docs
+    ├── operations.md          # ← Ops runbook (setup/deploy/reset)
+    ├── backend-architecture.md
+    └── ta-1-implementation_plan.md
 ```
 
 ---
@@ -113,5 +119,10 @@ docker compose logs -f api worker
 docker compose restart api
 
 # Rebuild after code changes
-docker compose up -d --build api
+docker compose up -d --build api worker
+
+# Run tests
+docker compose exec api pytest tests/test_api.py -v
 ```
+
+For full operations reference (teardown, data reset, troubleshooting), see [`artifiacts/operations.md`](./artifiacts/operations.md).

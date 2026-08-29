@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import settings
+from app.routers.problems import router as problems_router
+from app.routers.submissions import router as submissions_router
 
 app = FastAPI(
     title="CodeForge API",
@@ -18,10 +21,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routers (registered when implemented) ────────────────────────────────────
-# from app.routers import problems, submissions
-# app.include_router(problems.router, prefix="/api/v1")
-# app.include_router(submissions.router, prefix="/api/v1")
+# ── Prometheus metrics (/metrics) ─────────────────────────────────────────────
+Instrumentator().instrument(app).expose(app)
+
+# ── Routers ───────────────────────────────────────────────────────────────────
+API_PREFIX = "/api/v1"
+
+app.include_router(problems_router, prefix=API_PREFIX)
+app.include_router(submissions_router, prefix=API_PREFIX)
 
 
 # ── Health check ─────────────────────────────────────────────────────────────
