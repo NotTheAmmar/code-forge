@@ -84,8 +84,29 @@ def sample_problem(client, engine):
 
     async def _insert():
         async with session_factory() as session:
+            from app.models.user import User
+            from app.models.course import Course
+
+            user = User(
+                id=uuid.uuid4(),
+                email=f"test-{problem_id.hex[:6]}@example.com",
+                name="Test Instructor",
+                role="instructor",
+                password_hash="testpasshash",
+            )
+            course = Course(
+                id=uuid.uuid4(),
+                title="Test Course",
+                created_by=user.id,
+                invite_code=problem_id.hex[:6],
+            )
+            session.add_all([user, course])
+            await session.flush()
+
             problem = Problem(
                 id=problem_id,
+                course_id=course.id,
+                created_by=user.id,
                 slug=slug,
                 title="Test Hello World",
                 description="## Test\n\nA test problem.",

@@ -70,6 +70,7 @@ async def run_code(
     submission = Submission(
         id=uuid.uuid4(),
         problem_id=problem.id,
+        user_id=problem.created_by,
         language=body.language,
         source_code=body.source_code,
         status="queued",
@@ -105,6 +106,7 @@ async def submit_code(
     submission = Submission(
         id=uuid.uuid4(),
         problem_id=problem.id,
+        user_id=problem.created_by,
         language=body.language,
         source_code=body.source_code,
         status="queued",

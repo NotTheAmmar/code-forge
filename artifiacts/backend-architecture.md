@@ -76,17 +76,28 @@ backend/
     ├── dependencies.py         # Re-exports get_db
     ├── models/
     │   ├── __init__.py         # Re-exports all models
+    │   ├── user.py             # User account ORM model
+    │   ├── course.py           # Course ORM model
+    │   ├── enrollment.py       # Course membership ORM model
+    │   ├── lab_session.py      # LabSession & LabSessionProblem ORM models
+    │   ├── badge.py            # 1-to-1 Problem Badge ORM model
     │   ├── problem.py          # Problem ORM model
     │   ├── test_case.py        # TestCase ORM model
     │   └── submission.py       # Submission ORM model
     ├── schemas/
     │   ├── __init__.py
-    │   ├── problem.py          # ProblemSummary, ProblemDetail, TestCaseSummary
-    │   └── submission.py       # RunRequest, SubmissionCreated, SubmissionResponse
+    │   ├── auth.py             # RegisterRequest, LoginRequest, UserResponse, TokenResponse
+    │   ├── course.py           # CourseCreate, CourseResponse, CourseDetailResponse
+    │   ├── lab.py              # LabSessionCreate, LabDashboardResponse, StudentLabProgressResponse
+    │   ├── problem.py          # ProblemCreate, ProblemUpdate, BulkImportRequest, ProblemDetail
+    │   └── submission.py       # RunRequest, SubmitRequest, SubmissionResponse, GradebookResponse
     ├── routers/
     │   ├── __init__.py
-    │   ├── problems.py         # GET list, GET detail, POST run, POST submit
-    │   └── submissions.py      # GET submission by ID
+    │   ├── auth.py             # Register, Login, Refresh, Me
+    │   ├── courses.py          # Course CRUD, Join, Members, Gradebook
+    │   ├── labs.py             # Lab CRUD, Dashboard, Student Progress
+    │   ├── problems.py         # Course-scoped Problem CRUD & Bulk Import
+    │   └── submissions.py      # Run, Submit, Poll Submission, History
     ├── worker/
     │   ├── celery_app.py       # Celery instance + config
     │   ├── sync_db.py          # Sync SQLAlchemy session for Celery tasks

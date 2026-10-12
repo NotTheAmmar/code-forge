@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     # Redis / Celery
     redis_url: str = "redis://redis:6379/0"
 
-    # Auth (stubs for future phases)
+    # Auth
     jwt_secret_key: str = "change-me"
+    jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_days: int = 7
 

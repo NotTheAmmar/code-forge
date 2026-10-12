@@ -19,6 +19,11 @@ docker==7.1.0
 pydantic==2.9.2
 pydantic-settings==2.5.2
 
+# ── Auth & Security ──────────────────────────────────────────────────────────
+pyjwt==2.9.0
+bcrypt==4.2.0
+passlib[bcrypt]==1.7.4
+
 # ── Utilities ────────────────────────────────────────────────────────────────
 python-multipart==0.0.12
 httpx==0.27.2

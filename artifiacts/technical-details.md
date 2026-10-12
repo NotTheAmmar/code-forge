@@ -35,18 +35,42 @@ This document covers the full technical architecture, stack choices, database de
 │ password_hash│  │    │ invite_code      │       │ joined_at        │
 │ created_at   │  │    │ created_at       │       └──────────────────┘
 └──────────────┘  │    └──────────────────┘
-                  │
-                  │    ┌──────────────────┐       ┌──────────────────────┐
-                  │    │    problems       │       │     test_cases        │
-                  │    ├──────────────────┤       ├──────────────────────┤
-                  │    │ id (PK)          │──┐    │ id (PK)              │
-                  │    │ course_id (FK)   │  │    │ problem_id (FK)      │
-                  │    │ title            │  │    │ input_data (TEXT)     │
-                  │    │ description (TEXT)│  ├───│ expected_output (TEXT)│
-                  │    │ starter_code_java│  │    │ is_visible (BOOL)    │
-                  │    │ starter_code_py  │  │    │ order_index (INT)    │
-                  │    │ difficulty (enum)│  │    └──────────────────────┘
-                  │    │ time_limit_sec   │  │
+                  │       │            │
+                  │       │            ▼
+                  │       │     ┌──────────────────┐       ┌──────────────────────┐
+                  │       │     │  lab_sessions    │       │ lab_session_problems │
+                  │       │     ├──────────────────┤       ├──────────────────────┤
+                  │       │     │ id (PK)          │──┐    │ id (PK)              │
+                  │       │     │ course_id (FK)   │  └───→│ lab_session_id (FK)  │
+                  │       │     │ title            │       │ problem_id (FK)      │
+                  │       │     │ starts_at/ends_at│       │ order_index (INT)    │
+                  │       │     │ mandatory_count  │       └──────────────────────┘
+                  │       │     │ is_active (BOOL) │                   │
+                  │       │     └──────────────────┘                   │
+                  │       │               │                            │
+                  │       │               ▼                            │
+                  │       │     ┌──────────────────┐                   │
+                  │       │     │     badges       │                   │
+                  │       │     ├──────────────────┤                   │
+                  │       ├──┐  │ id (PK)          │                   │
+                  │       │  │  │ user_id (FK)     │                   │
+                  │       │  └──│ lab_session_id(FK)                   │
+                  │       │     │ problem_id (FK)  │                   │
+                  │       │     │ earned_at        │                   │
+                  │       │     └──────────────────┘                   │
+                  │       ▼                                            │
+                  │    ┌──────────────────┐                            │
+                  │    │    problems       │◄──────────────────────────┘
+                  │    ├──────────────────┤       ┌──────────────────────┐
+                  │    │ id (PK)          │──┐    │     test_cases        │
+                  │    │ course_id (FK)   │  │    ├──────────────────────┤
+                  │    │ created_by (FK)  │  │    │ id (PK)              │
+                  │    │ title            │  │    │ problem_id (FK)      │
+                  │    │ description (TEXT)│  ├───│ input_data (TEXT)     │
+                  │    │ starter_code_java│  │    │ expected_output (TEXT)│
+                  │    │ starter_code_py  │  │    │ is_visible (BOOL)    │
+                  │    │ difficulty (enum)│  │    │ order_index (INT)    │
+                  │    │ time_limit_sec   │  │    └──────────────────────┘
                   │    │ memory_limit_mb  │  │
                   │    │ created_at       │  │
                   │    └──────────────────┘  │
@@ -57,6 +81,7 @@ This document covers the full technical architecture, stack choices, database de
                   └───→│ id (PK)                  │
                        │ user_id (FK)             │
                        │ problem_id (FK)          │
+                       │ lab_session_id (FK)      │
                        │ language (enum: java|py) │
                        │ source_code (TEXT)        │
                        │ status (enum)             │
@@ -69,36 +94,29 @@ This document covers the full technical architecture, stack choices, database de
                        └──────────────────────────┘
 ```
 
-### Enums
+### Enums & Types
 
-| Enum | Values |
+| Enum / Type | Values |
 |---|---|
 | `user_role` | `instructor`, `student` |
 | `enrollment_role` | `instructor`, `student`, `ta` |
 | `difficulty` | `easy`, `medium`, `hard` |
 | `language` | `java`, `python` |
-| `submission_status` | `queued`, `running`, `completed`, `error`, `timeout` |
+| `submission_status` | `queued`, `running`, `completed`, `compile_error`, `error`, `timeout` |
+| `badge_model` | **Simple 1:1 count** (1 badge per extra problem solved beyond mandatory count) |
 
 ### `results_json` Structure (per submission)
-Stores individual test case results as a JSONB column for flexible querying:
+Stores individual test case results as a JSON column:
 ```json
 [
   {
-    "test_case_id": 1,
+    "test_case_id": "t1a2b3c4-0000-0000-0000-000000000001",
+    "label": "01",
     "is_visible": true,
     "passed": true,
     "expected_output": "Hello World",
     "actual_output": "Hello World",
     "execution_time_ms": 45,
-    "error": null
-  },
-  {
-    "test_case_id": 2,
-    "is_visible": false,
-    "passed": false,
-    "expected_output": "42",
-    "actual_output": "41",
-    "execution_time_ms": 38,
     "error": null
   }
 ]
@@ -108,47 +126,54 @@ Stores individual test case results as a JSONB column for flexible querying:
 
 ## 🔌 API Design
 
-All endpoints are prefixed with `/api/v1`. Authentication is via JWT tokens in the `Authorization: Bearer <token>` header.
+> 📘 **Full API Specification:** See [api-contracts.md](file:///home/ammar/Programs/code-forge/artifiacts/api-contracts.md) for full request/response schemas, Pydantic types, and error codes.
+
+All endpoints are prefixed with `/api/v1`. Authentication is via JWT tokens in `Authorization: Bearer <token>`.
 
 ### Auth
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/auth/register` | Register a new user (email, name, password, role). |
-| `POST` | `/auth/login` | Returns a JWT access token + refresh token. |
-| `POST` | `/auth/refresh` | Refresh an expired access token. |
-| `GET` | `/auth/me` | Get the current authenticated user's profile. |
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| `POST` | `/auth/register` | Register new user account. | Public |
+| `POST` | `/auth/login` | Login and receive access + refresh JWT tokens. | Public |
+| `POST` | `/auth/refresh` | Exchange refresh token for fresh access token. | Public |
+| `GET` | `/auth/me` | Current authenticated user profile. | User |
 
 ### Courses
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| `POST` | `/courses` | Create a new course. | Instructor |
-| `GET` | `/courses` | List courses the user is enrolled in. | Any |
-| `GET` | `/courses/{id}` | Get course details. | Enrolled |
-| `POST` | `/courses/{id}/join` | Join a course via invite code. | Student |
-| `GET` | `/courses/{id}/members` | List enrolled students + instructors. | Instructor |
+| `POST` | `/courses` | Create course (auto-generates 6-char invite code). | Instructor |
+| `GET` | `/courses` | List enrolled / created courses. | User |
+| `GET` | `/courses/{id}` | Course details. | Enrolled |
+| `POST` | `/courses/join` | Join course via invite code. | Student |
+| `GET` | `/courses/{id}/members` | List members in course. | Instructor |
 
 ### Problems
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| `POST` | `/courses/{id}/problems` | Create a new problem with test cases. | Instructor |
-| `GET` | `/courses/{id}/problems` | List all problems in a course. | Enrolled |
-| `GET` | `/problems/{id}` | Get problem details (description, starter code, visible test cases). | Enrolled |
-| `PUT` | `/problems/{id}` | Update a problem. | Instructor |
-| `DELETE` | `/problems/{id}` | Delete a problem and its test cases. | Instructor |
+| `POST` | `/courses/{id}/problems` | Create problem with test cases. | Instructor |
+| `POST` | `/courses/{id}/problems/bulk-import` | Bulk import problems via JSON array. | Instructor |
+| `GET` | `/courses/{id}/problems` | List problems in course. | Enrolled |
+| `GET` | `/problems/{id}` | Problem details + visible test cases + starter code. | Enrolled |
+| `PUT` | `/problems/{id}` | Update problem metadata / test cases. | Instructor |
+| `DELETE` | `/problems/{id}` | Delete problem. | Instructor |
 
-### Submissions
+### Lab Sessions & Badges
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| `POST` | `/problems/{id}/run` | Run code against **visible** test cases only (no grade saved). | Student |
-| `POST` | `/problems/{id}/submit` | Submit code for grading against **all** test cases. | Student |
-| `GET` | `/problems/{id}/submissions` | Get the current user's submissions for a problem. | Student |
-| `GET` | `/problems/{id}/submissions/all` | Get all student submissions for a problem (gradebook). | Instructor |
-| `GET` | `/submissions/{id}` | Get detailed results for a specific submission. | Owner/Instructor |
+| `POST` | `/courses/{id}/labs` | Create lab session with mandatory count & problems. | Instructor |
+| `GET` | `/courses/{id}/labs` | List course lab sessions. | Enrolled |
+| `GET` | `/labs/{id}` | Get lab details and assigned problems. | Enrolled |
+| `GET` | `/labs/{id}/dashboard` | Real-time instructor dashboard (student progress, badges). | Instructor |
+| `GET` | `/labs/{id}/my-progress` | Student progress, solved problems, and earned badges. | Student |
 
-### WebSocket
-| Endpoint | Description |
-|---|---|
-| `WS /ws/submissions/{submission_id}` | Real-time status updates for a submission (`queued` → `running` → `completed`). |
+### Submissions & Grading
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| `POST` | `/problems/{id}/run` | Run code against visible test cases only. | Student |
+| `POST` | `/problems/{id}/submit` | Submit code for full grading (+ lab session tagging). | Student |
+| `GET` | `/problems/{id}/submissions` | Current user's submission history for problem. | Student |
+| `GET` | `/submissions/{id}` | Get submission execution results. | Owner/Instructor |
+| `GET` | `/courses/{id}/gradebook` | Student × Problem score matrix. | Instructor |
 
 ---
 

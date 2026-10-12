@@ -26,10 +26,25 @@ class Submission(Base):
         nullable=False,
         index=True,
     )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Student who submitted the code",
+    )
+    lab_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("lab_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Associated lab session if submitted during an active lab",
+    )
     language: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
         default="java",
+        comment="java | python",
     )
     source_code: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(
@@ -75,9 +90,17 @@ class Submission(Base):
         "Problem",
         back_populates="submissions",
     )
+    user: Mapped["User"] = relationship(  # noqa: F821
+        "User",
+        back_populates="submissions",
+    )
+    lab_session: Mapped["LabSession | None"] = relationship(  # noqa: F821
+        "LabSession",
+        back_populates="submissions",
+    )
 
     def __repr__(self) -> str:
         return (
-            f"<Submission id={self.id} status={self.status!r} "
+            f"<Submission id={self.id} user_id={self.user_id} status={self.status!r} "
             f"score={self.score} problem_id={self.problem_id}>"
         )
