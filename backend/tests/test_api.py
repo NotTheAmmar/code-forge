@@ -1,12 +1,3 @@
-"""Integration tests for API endpoints.
-
-These tests use FastAPI's TestClient which doesn't require a live server,
-but they DO require a running PostgreSQL database (set up via docker compose).
-
-Run with:
-    docker compose exec api pytest tests/test_api.py -v
-"""
-
 import uuid
 from unittest.mock import MagicMock, patch
 
@@ -16,11 +7,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
-from app.dependencies import get_db
+from app.dependencies import get_db, get_current_user
 from app.main import app
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.test_case import TestCase
+from app.models.user import User
 
 # ── Test database setup ───────────────────────────────────────────────────────
 # Uses an in-memory SQLite DB for fast, isolated tests.
@@ -28,6 +20,16 @@ from app.models.test_case import TestCase
 # equivalents. For full fidelity, use a real Postgres test DB.
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+# Shared fake user for endpoints that require auth
+_FAKE_USER_ID = uuid.uuid4()
+_FAKE_USER = User(
+    id=_FAKE_USER_ID,
+    email="testuser@api-test.com",
+    name="Test User",
+    role="instructor",
+    password_hash="fakehash",
+)
 
 
 @pytest.fixture(scope="session")
@@ -65,7 +67,11 @@ def client(engine):
                 await session.rollback()
                 raise
 
+    async def override_get_current_user():
+        return _FAKE_USER
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -75,7 +81,9 @@ def client(engine):
 def sample_problem(client, engine):
     """Insert a sample problem with two test cases into the test DB."""
     import asyncio
+    from sqlalchemy import select as sa_select
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from app.models.course import Course
 
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     problem_id = uuid.uuid4()
@@ -84,29 +92,33 @@ def sample_problem(client, engine):
 
     async def _insert():
         async with session_factory() as session:
-            from app.models.user import User
-            from app.models.course import Course
+            # Ensure _FAKE_USER exists in DB (may have been inserted by a previous fixture run)
+            existing_user = (await session.execute(
+                sa_select(User).where(User.id == _FAKE_USER_ID)
+            )).scalar_one_or_none()
+            if existing_user is None:
+                session.add(User(
+                    id=_FAKE_USER_ID,
+                    email=_FAKE_USER.email,
+                    name=_FAKE_USER.name,
+                    role=_FAKE_USER.role,
+                    password_hash=_FAKE_USER.password_hash,
+                ))
+                await session.flush()
 
-            user = User(
-                id=uuid.uuid4(),
-                email=f"test-{problem_id.hex[:6]}@example.com",
-                name="Test Instructor",
-                role="instructor",
-                password_hash="testpasshash",
-            )
             course = Course(
                 id=uuid.uuid4(),
                 title="Test Course",
-                created_by=user.id,
+                created_by=_FAKE_USER_ID,
                 invite_code=problem_id.hex[:6],
             )
-            session.add_all([user, course])
+            session.add(course)
             await session.flush()
 
             problem = Problem(
                 id=problem_id,
                 course_id=course.id,
-                created_by=user.id,
+                created_by=_FAKE_USER_ID,
                 slug=slug,
                 title="Test Hello World",
                 description="## Test\n\nA test problem.",

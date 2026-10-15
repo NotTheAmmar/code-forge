@@ -1,33 +1,66 @@
 # CodeForge Backend Architecture
 
+**Version:** 0.3.0 (TA-2 — Phase A1 + A2 complete)
+
 ## Overview
 
-The CodeForge backend is a **FastAPI** application backed by **PostgreSQL**, with a **Celery** worker that executes Java code in ephemeral **Docker** containers.
+The CodeForge backend is a **FastAPI** application backed by **PostgreSQL**, with a **Celery** worker that executes Java/Python code in ephemeral **Docker** containers.
 
 ```
-Browser ──HTTP──▶ Nginx ──proxy──▶ FastAPI (api:8000)
-                                        │
-                                        │ .delay()
-                                        ▼
-                                   Celery Worker (worker)
-                                        │
-                                        │ docker SDK
-                                        ▼
-                                   Sandbox Container (ephemeral)
-                                   codeforge-sandbox-java
+Browser ──HTTP──▶ FastAPI (api:8000)
+                       │
+                       │ .delay()
+                       ▼
+                  Celery Worker (worker)
+                       │
+                       │ docker SDK
+                       ▼
+                  Sandbox Container (ephemeral)
+                  codeforge-sandbox-java | codeforge-sandbox-python
 ```
+
+---
+
+## Implementation Status
+
+| Phase | Description | Status |
+|---|---|---|
+| Phase 0 | Schema, migrations, config, sandbox image | ✅ Done |
+| Phase A1 | Auth system (register, login, refresh, me, JWT deps) | ✅ Done |
+| Phase A2 | Course CRUD, problem CRUD, bulk import, gradebook | ✅ Done |
+| Phase A3 | Lab sessions + badge engine | 🔲 Planned |
+| Phase A4 | Submission history, user profile, security hardening | 🔲 Planned |
+| Phase A5 | Polish + single-exe installer + monitoring | 🔲 Planned |
 
 ---
 
 ## Request Flow
 
+### Auth (JWT)
+
+```
+POST /api/v1/auth/login
+        │
+        ├─ Look up User by email
+        ├─ bcrypt verify password
+        ├─ Create access token (HS256, 15 min) + refresh token (7 days)
+        └─ Return { access_token, refresh_token, user }
+
+Protected endpoints:
+        │
+        ├─ Extract Bearer token from Authorization header
+        ├─ jwt.decode() → payload { sub: user_id, role, type }
+        └─ SELECT User WHERE id = payload.sub
+```
+
 ### Run / Submit
 
 ```
-POST /api/v1/problems/{slug}/run
+POST /api/v1/problems/{slug}/run   (auth required)
         │
+        ├─ get_current_user (JWT) → User
         ├─ Fetch problem from DB (ensure it exists)
-        ├─ Create Submission record (status: "queued")
+        ├─ Create Submission record (status: "queued", user_id=current_user.id)
         ├─ grade_submission.delay(submission_id)  ← non-blocking
         └─ Return { submission_id }
                 │
@@ -36,19 +69,19 @@ POST /api/v1/problems/{slug}/run
         grade_submission(submission_id)
                 │
                 ├─ Update status → "running"
-                ├─ Write Solution.java to temp dir
-                ├─ Compile: javac in sandbox container
+                ├─ Write Solution.java / solution.py to temp dir
+                ├─ Compile: javac in sandbox container (Java only)
                 │       └─ If fail → status: "compile_error"
                 │
                 └─ For each test case:
                         ├─ Create ephemeral container
-                        ├─ Copy .class files
+                        ├─ Copy source/class files
                         ├─ Feed stdin
                         ├─ Capture stdout/stderr
                         ├─ Compare normalize(stdout) == normalize(expected)
                         └─ Remove container (try/finally)
                 │
-                └─ Update Submission with results
+                └─ Update Submission with results, score, status
 
 GET /api/v1/submissions/{id}   ← polled by frontend every 1.5s
         └─ Return current Submission state
@@ -60,51 +93,56 @@ GET /api/v1/submissions/{id}   ← polled by frontend every 1.5s
 
 ```
 backend/
-├── manage.py                   # CLI: python manage.py load-problems ./problems/
 ├── pytest.ini
 ├── requirements.txt
 ├── Dockerfile
 ├── alembic.ini
 ├── alembic/
 │   ├── env.py                  # Async migration runner
-│   ├── script.py.mako
-│   └── versions/               # Generated migration files
+│   └── versions/
+│       └── 8f615a4a5063_ta2_schema.py  ← Phase 0 migration (applied)
 └── app/
-    ├── main.py                 # FastAPI app, CORS, router registration
+    ├── main.py                 # FastAPI app v0.3.0, CORS, router registration
     ├── config.py               # Pydantic settings (reads .env)
-    ├── db.py                   # Async SQLAlchemy engine + get_db dependency
-    ├── dependencies.py         # Re-exports get_db
+    ├── db.py                   # Async SQLAlchemy engine + Base + get_db
+    ├── dependencies.py         # get_current_user, require_instructor, RequireEnrollment
     ├── models/
-    │   ├── __init__.py         # Re-exports all models
-    │   ├── user.py             # User account ORM model
-    │   ├── course.py           # Course ORM model
-    │   ├── enrollment.py       # Course membership ORM model
-    │   ├── lab_session.py      # LabSession & LabSessionProblem ORM models
-    │   ├── badge.py            # 1-to-1 Problem Badge ORM model
-    │   ├── problem.py          # Problem ORM model
-    │   ├── test_case.py        # TestCase ORM model
-    │   └── submission.py       # Submission ORM model
+    │   ├── __init__.py         # Re-exports all models (for Alembic detection)
+    │   ├── user.py             # User (id, email, name, role, password_hash)
+    │   ├── course.py           # Course (id, title, created_by, invite_code)
+    │   ├── enrollment.py       # Enrollment (user_id, course_id, role)
+    │   ├── problem.py          # Problem (course_id, created_by, slug, test_cases…)
+    │   ├── test_case.py        # TestCase (problem_id, label, input, expected, visible)
+    │   ├── submission.py       # Submission (user_id, problem_id, lab_session_id, score…)
+    │   ├── lab_session.py      # LabSession + LabSessionProblem (Phase A3)
+    │   └── badge.py            # Badge (user_id, lab_session_id, problem_id)
     ├── schemas/
     │   ├── __init__.py
-    │   ├── auth.py             # RegisterRequest, LoginRequest, UserResponse, TokenResponse
-    │   ├── course.py           # CourseCreate, CourseResponse, CourseDetailResponse
-    │   ├── lab.py              # LabSessionCreate, LabDashboardResponse, StudentLabProgressResponse
-    │   ├── problem.py          # ProblemCreate, ProblemUpdate, BulkImportRequest, ProblemDetail
-    │   └── submission.py       # RunRequest, SubmitRequest, SubmissionResponse, GradebookResponse
+    │   ├── auth.py             # RegisterRequest, LoginRequest, TokenResponse, UserResponse
+    │   ├── course.py           # CourseCreate, CourseResponse, CourseDetailResponse, EnrollmentResponse, CourseMemberResponse
+    │   ├── problem.py          # ProblemCreate, ProblemUpdate, ProblemDetail, ProblemSummary, BulkImportRequest/Response
+    │   ├── lab.py              # LabSessionCreate, LabDashboardResponse (Phase A3)
+    │   └── submission.py       # RunRequest, SubmissionCreated, SubmissionResponse
     ├── routers/
     │   ├── __init__.py
-    │   ├── auth.py             # Register, Login, Refresh, Me
-    │   ├── courses.py          # Course CRUD, Join, Members, Gradebook
-    │   ├── labs.py             # Lab CRUD, Dashboard, Student Progress
-    │   ├── problems.py         # Course-scoped Problem CRUD & Bulk Import
-    │   └── submissions.py      # Run, Submit, Poll Submission, History
-    ├── worker/
-    │   ├── celery_app.py       # Celery instance + config
-    │   ├── sync_db.py          # Sync SQLAlchemy session for Celery tasks
-    │   ├── tasks.py            # grade_submission Celery task
-    │   └── sandbox.py          # Docker execution engine
-    └── websocket/
-        └── submissions_ws.py   # (Future: real-time WebSocket updates)
+    │   ├── auth.py             # POST /auth/register, /login, /refresh; GET /auth/me
+    │   ├── courses.py          # Course CRUD, Join, Members, Problem CRUD, Bulk Import, Gradebook
+    │   ├── problems.py         # Legacy GET /problems, GET /problems/{slug}, POST /problems/{slug}/run|submit
+    │   └── submissions.py      # GET /submissions/{id}
+    ├── services/
+    │   ├── __init__.py
+    │   └── auth_service.py     # hash_password, verify_password, create/decode JWT tokens
+    └── worker/
+        ├── celery_app.py       # Celery instance + config
+        ├── sync_db.py          # Sync SQLAlchemy session for Celery tasks
+        ├── tasks.py            # grade_submission Celery task
+        └── sandbox.py          # Docker execution engine (Java + Python)
+
+tests/
+    ├── test_api.py             # 10 tests: problems + submissions legacy endpoints
+    ├── test_auth.py            # 28 tests: auth service + auth endpoints
+    ├── test_courses.py         # 34 tests: course CRUD, problem CRUD, gradebook
+    └── test_sandbox.py         # 14 tests: Docker sandbox execution
 ```
 
 ---
@@ -112,43 +150,81 @@ backend/
 ## Database Schema
 
 ```
+users
+├── id             UUID PK
+├── email          VARCHAR(255) UNIQUE
+├── name           VARCHAR(255)
+├── role           VARCHAR(32)          ← instructor | student
+├── password_hash  VARCHAR(256)
+└── created_at     TIMESTAMPTZ
+
+courses
+├── id             UUID PK
+├── title          VARCHAR(256)
+├── description    TEXT nullable
+├── created_by     UUID FK → users.id (CASCADE)
+├── invite_code    VARCHAR(16) UNIQUE   ← 6-char alphanumeric
+└── created_at     TIMESTAMPTZ
+
+enrollments
+├── id             UUID PK
+├── user_id        UUID FK → users.id (CASCADE)
+├── course_id      UUID FK → courses.id (CASCADE)
+├── role           VARCHAR(32)          ← instructor | student | ta
+├── joined_at      TIMESTAMPTZ
+└── UNIQUE(user_id, course_id)
+
 problems
 ├── id             UUID PK
-├── slug           VARCHAR(128) UNIQUE  ← matches problems/ folder name
+├── course_id      UUID FK → courses.id (CASCADE)
+├── created_by     UUID FK → users.id (SET NULL)
+├── slug           VARCHAR(128) UNIQUE
 ├── title          VARCHAR(256)
-├── description    TEXT                 ← Markdown from description.md
+├── description    TEXT                 ← Markdown
 ├── difficulty     VARCHAR(16)          ← easy | medium | hard
 ├── starter_code_java TEXT
+├── starter_code_python TEXT nullable
 ├── time_limit_sec INT (default 10)
 ├── memory_limit_mb INT (default 128)
 └── created_at     TIMESTAMPTZ
 
 test_cases
 ├── id             UUID PK
-├── problem_id     UUID FK → problems.id (CASCADE DELETE)
-├── label          VARCHAR(16)   ← "01", "02", ...
-├── input_data     TEXT          ← contents of XX.in
-├── expected_output TEXT         ← contents of XX.out
+├── problem_id     UUID FK → problems.id (CASCADE)
+├── label          VARCHAR(16)          ← "01", "02", ...
+├── input_data     TEXT
+├── expected_output TEXT
 ├── is_visible     BOOL
 └── order_index    INT
 
 submissions
 ├── id             UUID PK
-├── problem_id     UUID FK → problems.id (CASCADE DELETE)
-├── language       VARCHAR(32) (default "java")
+├── problem_id     UUID FK → problems.id (CASCADE)
+├── user_id        UUID FK → users.id (CASCADE)
+├── lab_session_id UUID FK → lab_sessions.id (SET NULL) nullable
+├── language       VARCHAR(32)          ← java | python
 ├── source_code    TEXT
-├── status         VARCHAR(32)   ← queued|running|completed|compile_error|error|timeout
-├── is_full_submit BOOL          ← False=Run (visible only), True=Submit (all)
-├── score          INT nullable  ← 0-100 percentage
+├── status         VARCHAR(32)          ← queued|running|completed|compile_error|error|timeout
+├── is_full_submit BOOL
+├── score          INT nullable          ← 0-100
 ├── total_cases    INT nullable
 ├── passed_cases   INT nullable
-├── results_json   JSON nullable ← array of TestCaseResult objects
+├── results_json   JSON nullable         ← array of per-test-case results
 ├── execution_time_ms INT nullable
 └── submitted_at   TIMESTAMPTZ
+
+lab_sessions  (Phase A3)
+├── id, course_id, title, starts_at, ends_at, mandatory_count, is_active, created_at
+
+lab_session_problems  (Phase A3)
+├── id, lab_session_id, problem_id, order_index
+
+badges  (Phase A3)
+├── id, user_id, lab_session_id, problem_id, earned_at
+└── UNIQUE(user_id, lab_session_id, problem_id)
 ```
 
-### results_json Schema
-
+### `results_json` Structure (per submission)
 ```json
 [
   {
@@ -156,31 +232,68 @@ submissions
     "label": "01",
     "is_visible": true,
     "passed": true,
-    "expected_output": "Hello, Alice!",
-    "actual_output": "Hello, Alice!",
-    "execution_time_ms": 42,
+    "expected_output": "Hello World",
+    "actual_output": "Hello World",
+    "execution_time_ms": 45,
     "error": null
   }
 ]
 ```
-
-> **Privacy rule:** For hidden test cases (is_visible: false), expected_output and actual_output are set to null before saving. Frontend only receives pass/fail for hidden cases.
+> Hidden test cases (`is_visible: false`) have `expected_output` and `actual_output` nulled before saving — students only see pass/fail.
 
 ---
 
-## API Contract
+## API Surface
 
-All endpoints are mounted under /api/v1 (proxied by Nginx from /api/v1).
+All endpoints mounted at `/api/v1`. Full request/response schemas: see [`api-contracts.md`](./api-contracts.md).
 
-| Method | Endpoint | Description | Returns |
+### Auth ✅
+| Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | /problems | List all problems | ProblemSummary[] |
-| GET | /problems/{slug} | Full problem + test cases | ProblemDetail |
-| POST | /problems/{slug}/run | Run against visible tests | { submission_id } 202 |
-| POST | /problems/{slug}/submit | Run against all tests | { submission_id } 202 |
-| GET | /submissions/{id} | Polling endpoint for status | SubmissionResponse |
-| GET | /health | Liveness probe | { status: "ok" } |
-| GET | /metrics | Prometheus metrics scrape | text/plain (Prometheus format) |
+| `POST` | `/auth/register` | Public | Register new user |
+| `POST` | `/auth/login` | Public | Login, receive JWT tokens |
+| `POST` | `/auth/refresh` | Public | Refresh access token |
+| `GET` | `/auth/me` | User | Current user profile |
+
+### Courses ✅
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/courses` | Instructor | Create course (auto-generates invite code, auto-enrolls creator) |
+| `GET` | `/courses` | User | List enrolled courses |
+| `GET` | `/courses/{id}` | Enrolled | Course details |
+| `POST` | `/courses/{id}/join` | User | Join via invite code |
+| `GET` | `/courses/{id}/members` | Course instructor | Member list |
+
+### Problems ✅
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/courses/{id}/problems` | Course instructor | Create problem + test cases |
+| `POST` | `/courses/{id}/problems/bulk-import` | Course instructor | Bulk import from JSON array |
+| `GET` | `/courses/{id}/problems` | Enrolled | List course problems |
+| `GET` | `/courses/{id}/problems/{pid}` | Enrolled | Problem detail |
+| `PUT` | `/problems/{id}` | Course instructor | Update problem / replace test cases |
+| `DELETE` | `/problems/{id}` | Course instructor | Delete problem (cascades) |
+
+### Gradebook ✅
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/courses/{id}/gradebook` | Course instructor | Student × Problem score matrix |
+
+### Submissions ✅
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/problems/{slug}/run` | User | Run against visible test cases |
+| `POST` | `/problems/{slug}/submit` | User | Submit for full grade |
+| `GET` | `/submissions/{id}` | Public* | Poll submission status |
+
+### Lab Sessions & Badges 🔲 (Phase A3)
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/courses/{id}/labs` | Instructor | Create lab session |
+| `GET` | `/courses/{id}/labs` | Enrolled | List labs |
+| `GET` | `/labs/{id}` | Enrolled | Lab details + problems |
+| `GET` | `/labs/{id}/dashboard` | Instructor | Live student progress |
+| `GET` | `/labs/{id}/my-progress` | Student | Own progress + badges |
 
 ---
 
@@ -188,47 +301,25 @@ All endpoints are mounted under /api/v1 (proxied by Nginx from /api/v1).
 
 | Constraint | Value |
 |---|---|
-| Memory limit | memory_limit_mb m (per problem, default 128m) |
+| Memory limit | `memory_limit_mb` m per problem (default 128m) |
 | CPU limit | 0.5 CPU (cpu_quota=50000, cpu_period=100000) |
-| Network | Disabled (network_disabled=True) |
-| Root filesystem | Writable (required for `put_archive`; write access is harmless as network is disabled and user is non-root) |
-| /tmp tmpfs | 32MB, noexec,nosuid |
-| Capabilities | All dropped (cap_drop=["ALL"]) |
-| Privilege escalation | Blocked (security_opt=["no-new-privileges"]) |
-| User | Non-root runner (set in sandbox Dockerfile) |
-| Timeout | time_limit_sec seconds (per problem, default 10s) |
-| Cleanup | container.remove(force=True) in finally block |
+| Network | Disabled (`network_disabled=True`) |
+| Capabilities | All dropped (`cap_drop=["ALL"]`) |
+| Privilege escalation | Blocked (`security_opt=["no-new-privileges"]`) |
+| `/tmp` tmpfs | 32MB, noexec, nosuid |
+| User | Non-root `runner` (set in sandbox Dockerfile) |
+| Timeout | `time_limit_sec` per problem (default 10s) |
+| Cleanup | `container.remove(force=True)` in `finally` block |
 
 ---
 
 ## Submission Status Machine
 
 ```
-queued --> running --> completed
-                  |--> compile_error
-                  |--> timeout
-                  `--> error
-```
-
-- **queued** - Submission created, waiting for Celery worker
-- **running** - Worker started execution
-- **completed** - All test cases evaluated (some may have failed, check score)
-- **compile_error** - javac failed. results_json[0].error contains javac output
-- **timeout** - At least one test case exceeded time_limit_sec
-- **error** - Unexpected system error (Docker daemon issue, etc.)
-
----
-
-## Problem Loader CLI
-
-```bash
-# Load all problems
-docker compose exec api python manage.py load-problems ./problems/
-
-# Load a single problem
-docker compose exec api python manage.py load-problems ./problems/two-sum/
-
-# Idempotent - safe to re-run after edits
+queued → running → completed
+                ├→ compile_error
+                ├→ timeout
+                └→ error
 ```
 
 ---
@@ -236,23 +327,21 @@ docker compose exec api python manage.py load-problems ./problems/two-sum/
 ## Development Commands
 
 ```bash
-# Build and start the full stack
-docker compose up -d --build
+# Start DB + Redis (required for tests)
+docker compose up -d db redis
 
-# Run database migrations
-docker compose exec api alembic upgrade head
+# Rebuild API image (e.g. after requirements.txt change)
+docker compose build api worker
 
-# Load sample problems
-docker compose exec api python manage.py load-problems ./problems/
+# Run all tests
+docker compose run -v ./backend:/app --rm api pytest -v
 
-# View API docs
-open http://localhost:8000/docs
+# Apply database migrations
+docker compose run --rm api alembic upgrade head
 
-# Run fast tests (no Docker)
-docker compose exec api pytest tests/test_api.py -v
-
-# Run sandbox tests (requires Docker socket)
-docker compose exec api pytest tests/test_sandbox.py -v -s -m sandbox
+# View API docs (Swagger)
+# Start the API: docker compose up api
+# Then open: http://localhost:8000/docs
 
 # Worker logs
 docker compose logs -f worker

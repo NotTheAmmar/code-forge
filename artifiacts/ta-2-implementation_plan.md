@@ -282,33 +282,35 @@ badges
 
 **Tests:** `backend/tests/test_auth.py` — 28 tests, all passing (`52 passed` total suite).
 
-### Phase A2: Course System + Problem CRUD API (2-3 days)
+### Phase A2: Course System + Problem CRUD API ✅ (2-3 days)
 
 **Models:**
-- [ ] Create `Course` model (`app/models/course.py`).
-- [ ] Create `Enrollment` model (`app/models/enrollment.py`).
-- [ ] Update `Problem` model — add `course_id`, `created_by`, `starter_code_python` columns.
-- [ ] Update `Submission` model — add `user_id` column.
+- [x] Create `Course` model (`app/models/course.py`).
+- [x] Create `Enrollment` model (`app/models/enrollment.py`).
+- [x] Update `Problem` model — add `course_id`, `created_by`, `starter_code_python` columns.
+- [x] Update `Submission` model — add `user_id` column.
 
 **Schemas:**
-- [ ] Course schemas: `CourseCreate`, `CourseResponse`, `JoinRequest`.
-- [ ] Updated Problem schemas: `ProblemCreate` (with test cases inline), `ProblemUpdate`.
-- [ ] Gradebook schemas: `GradebookEntry`, `GradebookResponse`.
+- [x] Course schemas: `CourseCreate`, `CourseResponse`, `CourseDetailResponse`, `CourseJoinRequest`, `EnrollmentResponse`, `CourseMemberResponse`.
+- [x] Updated Problem schemas: `ProblemCreate` (with test cases inline), `ProblemUpdate`, `BulkImportRequest`, `BulkImportResponse`.
+- [x] Gradebook schemas: inline dict response (`problems` list + `rows` with per-student score map).
 
-**Routers:**
-- [ ] `POST /courses` — create course, auto-generate 6-char invite code, auto-enroll creator as instructor.
-- [ ] `GET /courses` — list courses for current user (via enrollments).
-- [ ] `GET /courses/{id}` — course details (enrolled users only).
-- [ ] `POST /courses/{id}/join` — join with invite code.
-- [ ] `GET /courses/{id}/members` — list members (instructor only).
-- [ ] `POST /courses/{id}/problems` — create problem with test cases (instructor only).
-- [ ] `PUT /problems/{id}` — update problem (instructor only).
-- [ ] `DELETE /problems/{id}` — delete problem + test cases (instructor only).
-- [ ] Refactor existing problem list endpoint to be course-scoped (all routes require auth — no anonymous access).
-- [ ] `POST /courses/{id}/problems/bulk-import` — accept a JSON array of problems (title, description, difficulty, starter codes, test cases) to quickly load a batch. Useful for seeding a course with a prepared problem set.
+**Routers (`app/routers/courses.py`):**
+- [x] `POST /courses` — create course, auto-generate 6-char invite code, auto-enroll creator as instructor.
+- [x] `GET /courses` — list courses for current user (via enrollments), with member/problem counts.
+- [x] `GET /courses/{id}` — course details (enrolled users only).
+- [x] `POST /courses/{id}/join` — join with invite code (case-insensitive, idempotent 409).
+- [x] `GET /courses/{id}/members` — list members (instructor of this course only).
+- [x] `POST /courses/{id}/problems` — create problem with test cases (instructor of this course only).
+- [x] `PUT /problems/{id}` — update problem, optionally replace full test case set (instructor only).
+- [x] `DELETE /problems/{id}` — delete problem + cascades, returns 204 (instructor only).
+- [x] Refactor `problems.py` run/submit — now require auth (`get_current_user`), use `current_user.id`.
+- [x] `POST /courses/{id}/problems/bulk-import` — per-problem transactional commit; partial failures skip and report.
 
 **Gradebook:**
-- [ ] `GET /courses/{id}/gradebook` — query all submissions for course problems, pivot into Student × Problem matrix with best scores.
+- [x] `GET /courses/{id}/gradebook` — aggregates best score per (student, problem); returns `{ problems, rows }` matrix.
+
+**Tests:** `backend/tests/test_courses.py` — 34 tests, all passing. Total suite: 86 tests.
 
 ### Phase A3: Lab Sessions + Badge Engine (2-3 days)
 
