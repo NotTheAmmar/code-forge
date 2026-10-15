@@ -257,28 +257,30 @@ badges
 
 ## Developer A: Backend
 
-### Phase A1: Auth System (2-3 days)
+### Phase A1: Auth System ✅ (2-3 days)
 
 **Models:**
-- [ ] Create `User` model (`app/models/user.py`).
-- [ ] Create password hashing utilities (`app/services/auth_service.py`) — bcrypt.
+- [x] Create `User` model (`app/models/user.py`).
+- [x] Create password hashing utilities (`app/services/auth_service.py`) — bcrypt via passlib.
 
 **Schemas:**
-- [ ] `RegisterRequest` (email, name, password, role).
-- [ ] `LoginRequest` (email, password).
-- [ ] `TokenResponse` (access_token, refresh_token, token_type).
-- [ ] `UserResponse` (id, email, name, role).
+- [x] `RegisterRequest` (email, name, password, role).
+- [x] `LoginRequest` (email, password).
+- [x] `TokenResponse` (access_token, refresh_token, token_type).
+- [x] `UserResponse` (id, email, name, role).
 
 **Router:**
-- [ ] Implement `POST /auth/register` — validate email uniqueness, hash password, create user.
-- [ ] Implement `POST /auth/login` — verify credentials, issue JWT tokens.
-- [ ] Implement `POST /auth/refresh` — validate refresh token, issue new access token.
-- [ ] Implement `GET /auth/me` — return current user from token.
+- [x] Implement `POST /auth/register` — validate email uniqueness, hash password, create user.
+- [x] Implement `POST /auth/login` — verify credentials, issue JWT tokens.
+- [x] Implement `POST /auth/refresh` — validate refresh token, issue new access token.
+- [x] Implement `GET /auth/me` — return current user from token.
 
 **Middleware:**
-- [ ] Create `get_current_user` dependency (`app/dependencies.py`) — decodes JWT, fetches user from DB.
-- [ ] Create `require_role(role)` dependency — checks user role.
-- [ ] Create `require_enrollment(course_id)` dependency — checks user is enrolled in the course.
+- [x] Create `get_current_user` dependency (`app/dependencies.py`) — decodes JWT, fetches user from DB.
+- [x] Create `require_role(role)` dependency — `require_instructor` checks user role, raises 403.
+- [x] Create `require_enrollment(course_id)` dependency — checks user is enrolled in the course.
+
+**Tests:** `backend/tests/test_auth.py` — 28 tests, all passing (`52 passed` total suite).
 
 ### Phase A2: Course System + Problem CRUD API (2-3 days)
 
