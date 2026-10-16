@@ -12,54 +12,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.db import Base
-from app.dependencies import get_db, get_current_user
+from app.dependencies import get_db
 from app.main import app
 from app.models.user import User
-from app.services.auth_service import hash_password
+from app.services.auth_service import create_access_token, hash_password
 
 # ── Shared async SQLite engine ────────────────────────────────────────────────
 
 @pytest.fixture(scope="module")
 def engine():
     return create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-
-
-@pytest.fixture(scope="module", autouse=True)
-def create_tables(engine):
-    import asyncio
-
-    async def _create():
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-    asyncio.get_event_loop().run_until_complete(_create())
-
-
-# ── Reusable fixture factory ──────────────────────────────────────────────────
-
-def _make_client(engine, current_user: User) -> TestClient:
-    """Return a TestClient with get_db and get_current_user overridden."""
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-
-    async def override_get_db():
-        async with session_factory() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-
-    async def override_get_current_user():
-        return current_user
-
-    app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_current_user] = override_get_current_user
-    return TestClient(app)
-
-
-def _clear_overrides():
-    app.dependency_overrides.clear()
 
 
 # ── Pre-built users ───────────────────────────────────────────────────────────
@@ -86,20 +48,59 @@ def student_user():
     )
 
 
+@pytest.fixture(scope="module", autouse=True)
+def create_tables(engine, instructor_user, student_user):
+    import asyncio
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _create():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        async with session_factory() as session:
+            session.add_all([instructor_user, student_user])
+            await session.commit()
+
+    asyncio.get_event_loop().run_until_complete(_create())
+
+
+@pytest.fixture(scope="module", autouse=True)
+def override_db(engine):
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def override_get_db():
+        async with session_factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db] = override_get_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
+
+
+# ── Reusable fixture factory ──────────────────────────────────────────────────
+
+def _make_client(engine, current_user: User) -> TestClient:
+    """Return a TestClient with Bearer token for current_user."""
+    token = create_access_token(str(current_user.id), current_user.role)
+    client = TestClient(app)
+    client.headers["Authorization"] = f"Bearer {token}"
+    return client
+
+
 @pytest.fixture
 def instr_client(engine, instructor_user):
-    client = _make_client(engine, instructor_user)
-    with client:
+    with _make_client(engine, instructor_user) as client:
         yield client
-    _clear_overrides()
 
 
 @pytest.fixture
 def student_client(engine, student_user):
-    client = _make_client(engine, student_user)
-    with client:
+    with _make_client(engine, student_user) as client:
         yield client
-    _clear_overrides()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -197,6 +198,7 @@ class TestGetCourseDetail:
         course_id = create.json()["id"]
 
         # Fresh student not enrolled in this course
+        import asyncio
         other_student = User(
             id=uuid.uuid4(),
             email="other@courses-test.com",
@@ -204,10 +206,15 @@ class TestGetCourseDetail:
             role="student",
             password_hash="x",
         )
-        client = _make_client(engine, other_student)
-        with client:
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async def _add():
+            async with session_factory() as s:
+                s.add(other_student)
+                await s.commit()
+        asyncio.get_event_loop().run_until_complete(_add())
+
+        with _make_client(engine, other_student) as client:
             resp = client.get(f"/api/v1/courses/{course_id}")
-        _clear_overrides()
         assert resp.status_code == 403
 
     def test_nonexistent_course_returns_404(self, instr_client):

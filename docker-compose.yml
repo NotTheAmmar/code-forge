@@ -14,12 +14,15 @@ services:
     build: ./backend
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://codeforge:password@db:5432/codeforge}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
       - PYTHONPATH=/app
     volumes:
+      - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
       - submissions:/app/submissions
       - ./problems:/app/problems:ro
@@ -35,12 +38,15 @@ services:
   worker:
     build: ./backend
     command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=4
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://codeforge:password@db:5432/codeforge}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
       - PYTHONPATH=/app
     volumes:
+      - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
       - submissions:/app/submissions
       - ./problems:/app/problems:ro

@@ -77,6 +77,7 @@ class SubmissionSummaryResponse(BaseModel):
     score: int | None = None
     passed_cases: int | None = None
     total_cases: int | None = None
+    is_full_submit: bool = True
     is_best: bool = False
     submitted_at: datetime
 

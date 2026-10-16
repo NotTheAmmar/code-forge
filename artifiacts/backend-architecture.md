@@ -1,6 +1,6 @@
 # CodeForge Backend Architecture
 
-**Version:** 0.3.0 (TA-2 — Phase A1 + A2 complete)
+**Version:** 0.5.1 (TA-2 — Phase A1 to A5 complete)
 
 ## Overview
 
@@ -28,9 +28,9 @@ Browser ──HTTP──▶ FastAPI (api:8000)
 | Phase 0 | Schema, migrations, config, sandbox image | ✅ Done |
 | Phase A1 | Auth system (register, login, refresh, me, JWT deps) | ✅ Done |
 | Phase A2 | Course CRUD, problem CRUD, bulk import, gradebook | ✅ Done |
-| Phase A3 | Lab sessions + badge engine | 🔲 Planned |
-| Phase A4 | Submission history, user profile, security hardening | 🔲 Planned |
-| Phase A5 | Polish + single-exe installer + monitoring | 🔲 Planned |
+| Phase A3 | Lab sessions + badge engine | ✅ Done |
+| Phase A4 | Submission history, user profile, security hardening | ✅ Done |
+| Phase A5 | Polish + single-command installer + monitoring | ✅ Done |
 
 ---
 
@@ -92,6 +92,7 @@ GET /api/v1/submissions/{id}   ← polled by frontend every 1.5s
 ## File Structure
 
 ```
+codeforge-setup.sh              # Single-command turnkey deployer & verifier
 backend/
 ├── pytest.ini
 ├── requirements.txt
@@ -102,10 +103,11 @@ backend/
 │   └── versions/
 │       └── 8f615a4a5063_ta2_schema.py  ← Phase 0 migration (applied)
 └── app/
-    ├── main.py                 # FastAPI app v0.3.0, CORS, router registration
+    ├── main.py                 # FastAPI app v0.5.0, CORS, router registration
     ├── config.py               # Pydantic settings (reads .env)
     ├── db.py                   # Async SQLAlchemy engine + Base + get_db
     ├── dependencies.py         # get_current_user, require_instructor, RequireEnrollment
+    ├── seed.py                 # Database seeder (admin/student users, CS101, problems, lab)
     ├── models/
     │   ├── __init__.py         # Re-exports all models (for Alembic detection)
     │   ├── user.py             # User (id, email, name, role, password_hash)
@@ -114,24 +116,26 @@ backend/
     │   ├── problem.py          # Problem (course_id, created_by, slug, test_cases…)
     │   ├── test_case.py        # TestCase (problem_id, label, input, expected, visible)
     │   ├── submission.py       # Submission (user_id, problem_id, lab_session_id, score…)
-    │   ├── lab_session.py      # LabSession + LabSessionProblem (Phase A3)
+    │   ├── lab_session.py      # LabSession + LabSessionProblem
     │   └── badge.py            # Badge (user_id, lab_session_id, problem_id)
     ├── schemas/
     │   ├── __init__.py
     │   ├── auth.py             # RegisterRequest, LoginRequest, TokenResponse, UserResponse
     │   ├── course.py           # CourseCreate, CourseResponse, CourseDetailResponse, EnrollmentResponse, CourseMemberResponse
     │   ├── problem.py          # ProblemCreate, ProblemUpdate, ProblemDetail, ProblemSummary, BulkImportRequest/Response
-    │   ├── lab.py              # LabSessionCreate, LabDashboardResponse (Phase A3)
-    │   └── submission.py       # RunRequest, SubmissionCreated, SubmissionResponse
+    │   ├── lab.py              # LabSessionCreate, LabSessionUpdate, LabSessionResponse, LabSessionDetailResponse, LabDashboardResponse, StudentLabProgressResponse
+    │   └── submission.py       # RunRequest, SubmitRequest, SubmissionCreated, SubmissionResponse, SubmissionSummaryResponse
     ├── routers/
     │   ├── __init__.py
     │   ├── auth.py             # POST /auth/register, /login, /refresh; GET /auth/me
     │   ├── courses.py          # Course CRUD, Join, Members, Problem CRUD, Bulk Import, Gradebook
-    │   ├── problems.py         # Legacy GET /problems, GET /problems/{slug}, POST /problems/{slug}/run|submit
-    │   └── submissions.py      # GET /submissions/{id}
+    │   ├── problems.py         # GET /problems, GET /problems/{slug}, POST /problems/{slug}/run|submit, GET /problems/{id}/submissions
+    │   ├── submissions.py      # GET /submissions/{id} (auth-gated)
+    │   └── labs.py             # Lab CRUD, Dashboard, Student Progress
     ├── services/
     │   ├── __init__.py
-    │   └── auth_service.py     # hash_password, verify_password, create/decode JWT tokens
+    │   ├── auth_service.py     # hash_password, verify_password, create/decode JWT tokens
+    │   └── badge_service.py    # evaluate_badges_sync, evaluate_badges_async
     └── worker/
         ├── celery_app.py       # Celery instance + config
         ├── sync_db.py          # Sync SQLAlchemy session for Celery tasks
@@ -142,7 +146,9 @@ tests/
     ├── test_api.py             # 10 tests: problems + submissions legacy endpoints
     ├── test_auth.py            # 28 tests: auth service + auth endpoints
     ├── test_courses.py         # 34 tests: course CRUD, problem CRUD, gradebook
-    └── test_sandbox.py         # 14 tests: Docker sandbox execution
+    ├── test_labs.py            # 10 tests: lab CRUD, dashboard, badge engine, student progress
+    ├── test_sandbox.py         # 20 tests: Java + Python Docker sandbox execution
+    └── test_submissions_history.py # 8 tests: submission history & access control
 ```
 
 ---
@@ -284,16 +290,18 @@ All endpoints mounted at `/api/v1`. Full request/response schemas: see [`api-con
 |---|---|---|---|
 | `POST` | `/problems/{slug}/run` | User | Run against visible test cases |
 | `POST` | `/problems/{slug}/submit` | User | Submit for full grade |
-| `GET` | `/submissions/{id}` | Public* | Poll submission status |
+| `GET` | `/submissions/{id}` | User (Owner/Instructor) | Poll submission status |
+| `GET` | `/problems/{id_or_slug}/submissions` | User | Past submissions for problem with `is_best` |
 
-### Lab Sessions & Badges 🔲 (Phase A3)
+### Lab Sessions & Badges ✅
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/courses/{id}/labs` | Instructor | Create lab session |
-| `GET` | `/courses/{id}/labs` | Enrolled | List labs |
-| `GET` | `/labs/{id}` | Enrolled | Lab details + problems |
-| `GET` | `/labs/{id}/dashboard` | Instructor | Live student progress |
-| `GET` | `/labs/{id}/my-progress` | Student | Own progress + badges |
+| `POST` | `/courses/{id}/labs` | Instructor | Create lab session + attach problems |
+| `GET` | `/courses/{id}/labs` | Enrolled | List course labs with problem counts |
+| `GET` | `/labs/{id}` | Enrolled | Lab details + ordered problem list |
+| `PUT` | `/labs/{id}` | Instructor | Update lab details / reassign problems |
+| `GET` | `/labs/{id}/dashboard` | Instructor | Live student progress & badge leaderboard |
+| `GET` | `/labs/{id}/my-progress` | Enrolled | Current student solves, badges, recent badge |
 
 ---
 
@@ -324,28 +332,28 @@ queued → running → completed
 
 ---
 
-## Development Commands
+## Development & Deployment Commands
 
 ```bash
-# Start DB + Redis (required for tests)
-docker compose up -d db redis
+# Turnkey deployment (verifies prerequisites, builds sandboxes, runs migrations, seeds DB)
+./codeforge-setup.sh
 
-# Rebuild API image (e.g. after requirements.txt change)
-docker compose build api worker
+# Turnkey deployment with rebuild of core API/worker images
+./codeforge-setup.sh --build
 
-# Run all tests
+# Run all tests (106 tests across auth, courses, labs, sandbox, submissions)
 docker compose run -v ./backend:/app --rm api pytest -v
 
-# Apply database migrations
+# Run database migrations manually
 docker compose run --rm api alembic upgrade head
 
-# View API docs (Swagger)
-# Start the API: docker compose up api
-# Then open: http://localhost:8000/docs
+# Re-run database seeding manually
+docker compose exec api python -m app.seed
 
-# Worker logs
-docker compose logs -f worker
+# View API documentation (Swagger)
+# Open: http://localhost:8000/docs
 
-# API logs
+# Tail logs
 docker compose logs -f api
+docker compose logs -f worker
 ```

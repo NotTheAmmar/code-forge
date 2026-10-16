@@ -22,7 +22,14 @@ def grade_submission(self, submission_id: str) -> dict:
     from app.worker.sync_db import get_sync_session
     from app.models.submission import Submission
 
-    logger.info("Starting grading task for submission %s", submission_id)
+    try:
+        with get_sync_session() as session:
+            sub_rec = session.get(Submission, uuid.UUID(submission_id))
+            sub_lang = (sub_rec.language if sub_rec and sub_rec.language else "java").lower()
+    except Exception:
+        sub_lang = "unknown"
+
+    logger.info("Starting grading task for submission %s [language=%s]", submission_id, sub_lang)
 
     try:
         result = execute_submission(submission_id)
@@ -32,6 +39,17 @@ def grade_submission(self, submission_id: str) -> dict:
             result.get("status"),
             result.get("score"),
         )
+
+        # Post-submission hook for badge evaluation during lab sessions
+        try:
+            with get_sync_session() as session:
+                sub = session.get(Submission, uuid.UUID(submission_id))
+                if sub and sub.lab_session_id and sub.score == 100:
+                    from app.services.badge_service import evaluate_badges_sync
+                    evaluate_badges_sync(session, sub)
+        except Exception as badge_exc:
+            logger.warning("Error evaluating badges for submission %s: %s", submission_id, badge_exc)
+
         return result
 
     except Exception as exc:

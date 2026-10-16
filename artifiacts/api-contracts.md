@@ -1,12 +1,12 @@
 # CodeForge API Contract Specification — TA-2
 
-**Version:** 2.1 (TA-2 Milestone — Phase A1 + A2 implemented)
+**Version:** 2.4 (TA-2 Milestone — Phase A1 to A5 complete)
 **Base URL:** `/api/v1`
 **Authentication:** Bearer token in HTTP header `Authorization: Bearer <access_token>`
 
 All endpoints return JSON responses. Errors use standard HTTP status codes with an `{ "detail": "message" }` payload.
 
-> **Implementation status key:** ✅ Implemented & tested | 🔲 Planned (A3–A5)
+> **Implementation status key:** ✅ Implemented & tested (all Developer A backend phases A1–A5 complete)
 
 ---
 
@@ -433,27 +433,36 @@ All endpoints return JSON responses. Errors use standard HTTP status codes with 
 ### 6.2 Submit Code (Full Grade)
 - **Endpoint:** `POST /api/v1/problems/{slug}/submit`
 - **Auth Required:** Yes
-- **Request Body (`RunRequest`):** *(same shape as run)*
-- **Response (`202 Accepted` — `SubmissionCreated`):** *(same shape)*
-> Runs against ALL test cases (visible + hidden). Score is persisted and counts toward gradebook.
+- **Request Body (`SubmitRequest`):**
+```json
+{
+  "source_code": "print('hello')",
+  "language": "python",
+  "lab_session_id": "l1a2b3c4-0000-0000-0000-000000000001"
+}
+```
+> Supported `language`: `"java"` | `"python"`. `lab_session_id` is optional. If omitted, the server checks if the problem belongs to a course with a currently active lab session (`starts_at <= now <= ends_at` or `is_active=True`), auto-tagging the submission to award badges.
+- **Response (`202 Accepted` — `SubmissionCreated`):** *(same shape as run)*
+> Runs against ALL test cases (visible + hidden). Score is persisted, counts toward gradebook, and triggers badge evaluation if solved during a lab session.
 
 ### 6.3 Poll Submission Status
 - **Endpoint:** `GET /api/v1/submissions/{id}`
-- **Auth Required:** No (current implementation — will be auth-gated in A4)
+- **Auth Required:** Yes (student owner or instructor)
 - **Response (`200 OK` — `SubmissionResponse`):**
 ```json
 {
   "id": "s1a2b3c4-0000-0000-0000-000000000002",
   "problem_id": "c1d2e3f4-0000-0000-0000-000000000001",
   "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "lab_session_id": "l1a2b3c4-0000-0000-0000-000000000001",
   "language": "python",
-  "source_code": "...",
   "status": "completed",
-  "is_full_submit": true,
   "score": 100,
   "total_cases": 4,
   "passed_cases": 4,
   "execution_time_ms": 112,
+  "badge_awarded": true,
+  "new_badge_count": 2,
   "results_json": [
     {
       "test_case_id": "t1a2b3c4-0000-0000-0000-000000000001",
@@ -469,15 +478,61 @@ All endpoints return JSON responses. Errors use standard HTTP status codes with 
   "submitted_at": "2026-10-12T15:42:10Z"
 }
 ```
-> Frontend polls this every 1.5s until `status` is not `"queued"` or `"running"`.
+> `badge_awarded` indicates if a new badge was unlocked by this specific submission. `new_badge_count` contains the student's updated total badge count in this lab session. Frontend polls this every 1.5s until `status` is not `"queued"` or `"running"`.
+- **Errors:** `401` — unauthenticated. `403` — forbidden (another student's submission). `404` — submission not found.
+
+### 6.4 Submission History
+- **Endpoint:** `GET /api/v1/problems/{id_or_slug}/submissions`
+- **Auth Required:** Yes
+- **Parameters:** `id_or_slug` — Problem UUID or URL slug
+- **Response (`200 OK` — `list[SubmissionSummaryResponse]`):**
+```json
+[
+  {
+    "id": "s1a2b3c4-0000-0000-0000-000000000003",
+    "language": "python",
+    "status": "completed",
+    "score": 100,
+    "passed_cases": 4,
+    "total_cases": 4,
+    "is_full_submit": true,
+    "is_best": false,
+    "submitted_at": "2026-10-12T16:00:00Z"
+  },
+  {
+    "id": "s1a2b3c4-0000-0000-0000-000000000002",
+    "language": "python",
+    "status": "completed",
+    "score": 100,
+    "passed_cases": 4,
+    "total_cases": 4,
+    "is_full_submit": true,
+    "is_best": true,
+    "submitted_at": "2026-10-12T15:42:10Z"
+  },
+  {
+    "id": "s1a2b3c4-0000-0000-0000-000000000001",
+    "language": "java",
+    "status": "completed",
+    "score": 75,
+    "passed_cases": 3,
+    "total_cases": 4,
+    "is_full_submit": true,
+    "is_best": false,
+    "submitted_at": "2026-10-12T15:20:00Z"
+  }
+]
+```
+> Returns the authenticated user's past submissions for this problem, ordered by `submitted_at DESC`. The best submission (highest score, earliest if tied) has `is_best: true`.
+- **Errors:** `401` — unauthenticated. `404` — problem not found.
 
 ---
 
-## 7. Lab Session & Badge Endpoints 🔲 (Phase A3)
+## 7. Lab Session & Badge Endpoints ✅
 
 ### 7.1 Create Lab Session
 - **Endpoint:** `POST /api/v1/courses/{course_id}/labs`
-- **Auth Required:** Yes (instructor)
+- **Auth Required:** Yes (course instructor)
 - **Request Body (`LabSessionCreate`):**
 ```json
 {
@@ -493,19 +548,103 @@ All endpoints return JSON responses. Errors use standard HTTP status codes with 
   ]
 }
 ```
-- **Response (`201 Created` — `LabSessionResponse`):** *(defined in Phase A3)*
+- **Response (`201 Created` — `LabSessionResponse`):**
+```json
+{
+  "id": "l1a2b3c4-0000-0000-0000-000000000001",
+  "course_id": "b1c2d3e4-0000-0000-0000-000000000001",
+  "title": "Lab 3 — Pointers and Memory",
+  "description": "2-hour lab covering pointer arithmetic and dynamic allocation",
+  "starts_at": "2026-10-12T14:00:00Z",
+  "ends_at": "2026-10-12T16:00:00Z",
+  "mandatory_count": 1,
+  "problem_count": 3,
+  "is_active": true,
+  "created_at": "2026-10-12T13:30:00Z"
+}
+```
+- **Errors:** `400` — problem not in course. `403` — not course instructor.
 
 ### 7.2 List Course Labs
 - **Endpoint:** `GET /api/v1/courses/{course_id}/labs`
-- **Auth Required:** Yes (enrolled)
+- **Auth Required:** Yes (enrolled in course)
+- **Response (`200 OK` — `list[LabSessionResponse]`):**
+```json
+[
+  {
+    "id": "l1a2b3c4-0000-0000-0000-000000000001",
+    "course_id": "b1c2d3e4-0000-0000-0000-000000000001",
+    "title": "Lab 3 — Pointers and Memory",
+    "description": "2-hour lab covering pointer arithmetic and dynamic allocation",
+    "starts_at": "2026-10-12T14:00:00Z",
+    "ends_at": "2026-10-12T16:00:00Z",
+    "mandatory_count": 1,
+    "problem_count": 3,
+    "is_active": true,
+    "created_at": "2026-10-12T13:30:00Z"
+  }
+]
+```
+- **Errors:** `403` — not enrolled.
 
 ### 7.3 Get Lab Session Details
 - **Endpoint:** `GET /api/v1/labs/{lab_id}`
-- **Auth Required:** Yes (enrolled)
+- **Auth Required:** Yes (enrolled in course)
+- **Response (`200 OK` — `LabSessionDetailResponse`):**
+```json
+{
+  "id": "l1a2b3c4-0000-0000-0000-000000000001",
+  "course_id": "b1c2d3e4-0000-0000-0000-000000000001",
+  "title": "Lab 3 — Pointers and Memory",
+  "description": "2-hour lab covering pointer arithmetic and dynamic allocation",
+  "starts_at": "2026-10-12T14:00:00Z",
+  "ends_at": "2026-10-12T16:00:00Z",
+  "mandatory_count": 1,
+  "is_active": true,
+  "problems": [
+    {
+      "id": "c1d2e3f4-0000-0000-0000-000000000001",
+      "slug": "reverse-string",
+      "title": "Reverse a String",
+      "difficulty": "easy",
+      "order_index": 0
+    },
+    {
+      "id": "c1d2e3f4-0000-0000-0000-000000000002",
+      "slug": "pointer-swap",
+      "title": "Pointer Swap",
+      "difficulty": "medium",
+      "order_index": 1
+    }
+  ],
+  "created_at": "2026-10-12T13:30:00Z"
+}
+```
+- **Errors:** `403` — not enrolled. `404` — lab not found.
 
-### 7.4 Live Lab Dashboard (Instructor)
+### 7.4 Update Lab Session
+- **Endpoint:** `PUT /api/v1/labs/{lab_id}`
+- **Auth Required:** Yes (course instructor)
+- **Request Body (`LabSessionUpdate`):**
+```json
+{
+  "title": "Lab 3 — Pointers and Memory (Extended)",
+  "ends_at": "2026-10-12T17:00:00Z",
+  "mandatory_count": 2,
+  "is_active": true,
+  "problem_ids": [
+    "c1d2e3f4-0000-0000-0000-000000000001",
+    "c1d2e3f4-0000-0000-0000-000000000002",
+    "c1d2e3f4-0000-0000-0000-000000000003"
+  ]
+}
+```
+- **Response (`200 OK` — `LabSessionDetailResponse`):** *(same shape as 7.3)*
+- **Errors:** `400` — problem not in course. `403` — not instructor. `404` — lab not found.
+
+### 7.5 Live Lab Dashboard (Instructor)
 - **Endpoint:** `GET /api/v1/labs/{lab_id}/dashboard`
-- **Auth Required:** Yes (instructor)
+- **Auth Required:** Yes (course instructor)
 - **Response (`200 OK` — `LabDashboardResponse`):**
 ```json
 {
@@ -513,22 +652,56 @@ All endpoints return JSON responses. Errors use standard HTTP status codes with 
   "title": "Lab 3 — Pointers and Memory",
   "mandatory_count": 1,
   "total_students": 25,
+  "active_students": 18,
+  "total_badges_awarded": 14,
   "students": [
     {
       "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "name": "Jane Doe",
+      "email": "jane@university.edu",
       "problems_solved": 3,
       "mandatory_completed": true,
       "badge_count": 2,
       "last_submission_at": "2026-10-12T15:42:10Z"
+    },
+    {
+      "user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa7",
+      "name": "John Smith",
+      "email": "john@university.edu",
+      "problems_solved": 1,
+      "mandatory_completed": true,
+      "badge_count": 0,
+      "last_submission_at": "2026-10-12T14:35:00Z"
     }
   ]
 }
 ```
+> Sorted by `badge_count DESC, problems_solved DESC, name ASC`.
+- **Errors:** `403` — not course instructor. `404` — lab not found.
 
-### 7.5 Student Lab Progress
+### 7.6 Student Lab Progress
 - **Endpoint:** `GET /api/v1/labs/{lab_id}/my-progress`
-- **Auth Required:** Yes (student)
+- **Auth Required:** Yes (enrolled in course)
+- **Response (`200 OK` — `StudentLabProgressResponse`):**
+```json
+{
+  "lab_id": "l1a2b3c4-0000-0000-0000-000000000001",
+  "mandatory_count": 1,
+  "problems_solved_count": 3,
+  "mandatory_completed": true,
+  "badge_count": 2,
+  "solved_problem_ids": [
+    "c1d2e3f4-0000-0000-0000-000000000001",
+    "c1d2e3f4-0000-0000-0000-000000000002",
+    "c1d2e3f4-0000-0000-0000-000000000003"
+  ],
+  "recent_badge_earned": {
+    "problem_id": "c1d2e3f4-0000-0000-0000-000000000003",
+    "earned_at": "2026-10-12T15:42:10Z"
+  }
+}
+```
+- **Errors:** `403` — not enrolled. `404` — lab not found.
 
 ---
 

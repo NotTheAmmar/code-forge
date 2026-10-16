@@ -272,3 +272,138 @@ public class Solution {
         assert len(containers) == 0, (
             f"Found {len(containers)} zombie containers after sandbox run"
         )
+
+
+@pytest.mark.sandbox
+class TestPythonSandbox:
+    """Integration tests that spawn real Python Docker containers."""
+
+    @pytest.fixture(autouse=True)
+    def check_docker(self):
+        """Skip sandbox tests if Docker is not available."""
+        try:
+            import docker
+            client = docker.from_env()
+            client.ping()
+            try:
+                client.images.get("codeforge-sandbox-python")
+            except docker.errors.ImageNotFound:
+                pytest.skip(
+                    "Sandbox image 'codeforge-sandbox-python' not found. "
+                    "Run: docker build -t codeforge-sandbox-python ./sandbox/python"
+                )
+        except Exception as e:
+            pytest.skip(f"Docker not available: {e}")
+
+    def test_python_correct_hello_world(self):
+        """Correct Python code passes test case."""
+        from app.worker.sandbox import _get_docker_client, _run_test_case
+        import tempfile, os
+
+        source = "import sys\nname = sys.stdin.read().strip()\nprint(f'Hello, {name}!')\n"
+        client = _get_docker_client()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with open(os.path.join(tmp_dir, "Solution.py"), "w") as f:
+                f.write(source)
+
+            tc = _make_mock_test_case("01", "Alice", "Hello, Alice!")
+            result = _run_test_case(client, tc, tmp_dir, time_limit_sec=5, memory_limit_mb=128, language="python")
+
+            assert result["passed"] is True
+            assert result["error"] is None
+            assert result["actual_output"] == "Hello, Alice!"
+            assert result["execution_time_ms"] is not None
+
+    def test_python_wrong_answer(self):
+        """Python code producing incorrect output is marked passed=False."""
+        from app.worker.sandbox import _get_docker_client, _run_test_case
+        import tempfile, os
+
+        source = "print('Wrong Answer')\n"
+        client = _get_docker_client()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with open(os.path.join(tmp_dir, "Solution.py"), "w") as f:
+                f.write(source)
+
+            tc = _make_mock_test_case("01", "", "Expected Answer")
+            result = _run_test_case(client, tc, tmp_dir, time_limit_sec=5, memory_limit_mb=128, language="python")
+
+            assert result["passed"] is False
+            assert result["error"] is None
+            assert result["actual_output"] == "Wrong Answer"
+
+    def test_python_runtime_exception(self):
+        """Python runtime exception (ZeroDivisionError) is captured."""
+        from app.worker.sandbox import _get_docker_client, _run_test_case
+        import tempfile, os
+
+        source = "x = 1 / 0\n"
+        client = _get_docker_client()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with open(os.path.join(tmp_dir, "Solution.py"), "w") as f:
+                f.write(source)
+
+            tc = _make_mock_test_case("01", "", "")
+            result = _run_test_case(client, tc, tmp_dir, time_limit_sec=5, memory_limit_mb=128, language="python")
+
+            assert result["passed"] is False
+            assert result["error"] is not None
+            assert "ZeroDivisionError" in result["error"]
+
+    def test_python_syntax_error(self):
+        """Python syntax error produces non-zero exit and syntax error info."""
+        from app.worker.sandbox import _get_docker_client, _run_test_case
+        import tempfile, os
+
+        source = "def foo(\n"
+        client = _get_docker_client()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with open(os.path.join(tmp_dir, "Solution.py"), "w") as f:
+                f.write(source)
+
+            tc = _make_mock_test_case("01", "", "")
+            result = _run_test_case(client, tc, tmp_dir, time_limit_sec=5, memory_limit_mb=128, language="python")
+
+            assert result["passed"] is False
+            assert result["error"] is not None
+            assert "SyntaxError" in result["error"]
+
+    def test_python_timeout(self):
+        """Python infinite loop is caught as Time Limit Exceeded."""
+        from app.worker.sandbox import _get_docker_client, _run_test_case
+        import tempfile, os
+
+        source = "while True:\n    pass\n"
+        client = _get_docker_client()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with open(os.path.join(tmp_dir, "Solution.py"), "w") as f:
+                f.write(source)
+
+            tc = _make_mock_test_case("01", "", "")
+            result = _run_test_case(client, tc, tmp_dir, time_limit_sec=2, memory_limit_mb=128, language="python")
+
+            assert result["passed"] is False
+            assert result["error"] == "Time Limit Exceeded"
+
+    def test_python_no_zombie_containers(self):
+        """Verify no sandbox containers survive after Python execution."""
+        import docker as docker_module
+        from app.worker.sandbox import _get_docker_client, _run_test_case
+        import tempfile, os
+
+        source = "print('done')\n"
+        client = _get_docker_client()
+        docker_client = docker_module.from_env()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with open(os.path.join(tmp_dir, "Solution.py"), "w") as f:
+                f.write(source)
+
+            tc = _make_mock_test_case("01", "", "done")
+            _run_test_case(client, tc, tmp_dir, time_limit_sec=5, memory_limit_mb=128, language="python")
+
+        containers = docker_client.containers.list(
+            all=True,
+            filters={"ancestor": "codeforge-sandbox-python", "status": "exited"}
+        )
+        assert len(containers) == 0, f"Found {len(containers)} zombie Python containers"

@@ -41,9 +41,13 @@ from app.models.test_case import TestCase
 
 logger = logging.getLogger(__name__)
 
-# The Docker image used for all Java sandbox containers.
-# Build it once with: docker build -t codeforge-sandbox-java ./sandbox/java
-SANDBOX_IMAGE = "codeforge-sandbox-java"
+# The Docker images used for sandbox containers.
+# Build them with:
+#   docker build -t codeforge-sandbox-java ./sandbox/java
+#   docker build -t codeforge-sandbox-python ./sandbox/python
+SANDBOX_JAVA_IMAGE = "codeforge-sandbox-java"
+SANDBOX_PYTHON_IMAGE = "codeforge-sandbox-python"
+SANDBOX_IMAGE = SANDBOX_JAVA_IMAGE  # Backward compatibility alias
 SANDBOX_WORKDIR = "/code"
 
 
@@ -139,47 +143,53 @@ def _compile_and_run(
     tmp_dir: str,
     session: Session,
 ) -> dict:
-    """Write source, compile, then run each test case."""
+    """Write source, compile (if Java), then run each test case."""
+    lang = (submission.language or "java").strip().lower()
 
-    # Write source code to file
-    source_path = os.path.join(tmp_dir, "Solution.java")
-    with open(source_path, "w", encoding="utf-8") as f:
-        f.write(submission.source_code)
+    if lang == "python":
+        source_path = os.path.join(tmp_dir, "Solution.py")
+        with open(source_path, "w", encoding="utf-8") as f:
+            f.write(submission.source_code)
+    else:
+        # Default Java
+        source_path = os.path.join(tmp_dir, "Solution.java")
+        with open(source_path, "w", encoding="utf-8") as f:
+            f.write(submission.source_code)
 
-    # ── Step 1: Compile ────────────────────────────────────────────────────
-    compile_result = _compile_java(docker_client, tmp_dir, problem)
+        # ── Step 1: Compile ────────────────────────────────────────────────────
+        compile_result = _compile_java(docker_client, tmp_dir, problem)
 
-    if not compile_result["success"]:
-        # Update submission: compile_error
-        submission.status = "compile_error"
-        submission.score = 0
-        submission.total_cases = len(test_cases)
-        submission.passed_cases = 0
-        submission.results_json = []
-        submission.execution_time_ms = 0
-        # Store compile error in results_json so the frontend can display it
-        submission.results_json = [{
-            "test_case_id": "compile",
-            "label": "compile",
-            "is_visible": True,
-            "passed": False,
-            "expected_output": None,
-            "actual_output": None,
-            "execution_time_ms": 0,
-            "error": compile_result["error"],
-        }]
-        session.commit()
-        logger.info(
-            "Submission %s: compile error", submission.id
-        )
-        return {
-            "status": "compile_error",
-            "score": 0,
-            "passed_cases": 0,
-            "total_cases": len(test_cases),
-            "results_json": submission.results_json,
-            "execution_time_ms": 0,
-        }
+        if not compile_result["success"]:
+            # Update submission: compile_error
+            submission.status = "compile_error"
+            submission.score = 0
+            submission.total_cases = len(test_cases)
+            submission.passed_cases = 0
+            submission.results_json = []
+            submission.execution_time_ms = 0
+            # Store compile error in results_json so the frontend can display it
+            submission.results_json = [{
+                "test_case_id": "compile",
+                "label": "compile",
+                "is_visible": True,
+                "passed": False,
+                "expected_output": None,
+                "actual_output": None,
+                "execution_time_ms": 0,
+                "error": compile_result["error"],
+            }]
+            session.commit()
+            logger.info(
+                "Submission %s: compile error", submission.id
+            )
+            return {
+                "status": "compile_error",
+                "score": 0,
+                "passed_cases": 0,
+                "total_cases": len(test_cases),
+                "results_json": submission.results_json,
+                "execution_time_ms": 0,
+            }
 
     # ── Step 2: Run each test case ─────────────────────────────────────────
     results = []
@@ -193,6 +203,7 @@ def _compile_and_run(
             tmp_dir=tmp_dir,
             time_limit_sec=problem.time_limit_sec,
             memory_limit_mb=problem.memory_limit_mb,
+            language=lang,
         )
         results.append(tc_result)
         if tc_result["passed"]:
@@ -319,19 +330,30 @@ def _run_test_case(
     tmp_dir: str,
     time_limit_sec: int,
     memory_limit_mb: int,
+    language: str = "java",
 ) -> dict:
-    """Execute the compiled Solution.class against a single test case.
+    """Execute the solution against a single test case.
 
     Strategy:
     - Write stdin to a file (stdin.txt) in tmp_dir.
-    - Copy .class files + stdin.txt into the container via put_archive.
-    - Run: sh -c 'java Solution < /code/stdin.txt'
+    - Copy code/class files + stdin.txt into the container via put_archive.
+    - Run:
+        Java:   sh -c 'java -cp /code Solution < /code/stdin.txt'
+        Python: sh -c 'python3 Solution.py < /code/stdin.txt'
     - Capture logs after completion.
 
     Returns a dict matching the TestCaseResult schema.
     """
     container = None
     start_time = time.monotonic()
+    is_python = (language or "java").strip().lower() == "python"
+    sandbox_img = SANDBOX_PYTHON_IMAGE if is_python else SANDBOX_JAVA_IMAGE
+    exec_cmd = (
+        ["sh", "-c", "python3 Solution.py < /code/stdin.txt"]
+        if is_python
+        else ["sh", "-c", "java -cp /code Solution < /code/stdin.txt"]
+    )
+    copy_exts = (".py", ".txt") if is_python else (".class", ".txt")
 
     try:
         # Write stdin to a temp file so we can copy it into the container
@@ -341,9 +363,9 @@ def _run_test_case(
 
         # Create container
         container = docker_client.containers.create(
-            image=SANDBOX_IMAGE,
+            image=sandbox_img,
             # Use sh to redirect stdin from file — avoids socket complexity
-            command=["sh", "-c", "java -cp /code Solution < /code/stdin.txt"],
+            command=exec_cmd,
             working_dir=SANDBOX_WORKDIR,
             network_disabled=True,
             mem_limit=f"{memory_limit_mb}m",
@@ -358,8 +380,8 @@ def _run_test_case(
             tmpfs={"/tmp": "size=32m,noexec,nosuid"},
         )
 
-        # Copy compiled .class files + stdin.txt into the container
-        _copy_files_to_container(container, tmp_dir, extensions=(".class", ".txt"))
+        # Copy compiled .class / .py files + stdin.txt into the container
+        _copy_files_to_container(container, tmp_dir, extensions=copy_exts)
 
         # Start
         container.start()

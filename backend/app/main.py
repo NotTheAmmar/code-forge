@@ -5,13 +5,14 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.config import settings
 from app.routers.auth import router as auth_router
 from app.routers.courses import router as courses_router
+from app.routers.labs import router as labs_router
 from app.routers.problems import router as problems_router
 from app.routers.submissions import router as submissions_router
 
 app = FastAPI(
     title="CodeForge API",
     description="Browser-based competitive programming judge — sandboxed code execution engine.",
-    version="0.3.0",
+    version="0.5.0",
 )
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ API_PREFIX = "/api/v1"
 
 app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(courses_router, prefix=API_PREFIX)
+app.include_router(labs_router, prefix=API_PREFIX)
 app.include_router(problems_router, prefix=API_PREFIX)
 app.include_router(submissions_router, prefix=API_PREFIX)
 

@@ -514,13 +514,9 @@ async def update_problem(
 
     # Replace test cases if provided
     if body.test_cases is not None:
-        # Delete existing
-        for tc in list(problem.test_cases):
-            await db.delete(tc)
-        await db.flush()
-        # Insert new
+        problem.test_cases.clear()
         for tc in body.test_cases:
-            db.add(
+            problem.test_cases.append(
                 TestCase(
                     id=uuid.uuid4(),
                     problem_id=problem.id,
@@ -591,12 +587,13 @@ async def bulk_import_problems(
             detail="Only course instructors can import problems.",
         )
 
+    user_id = current_user.id
     imported_slugs: list[str] = []
     errors: list[str] = []
 
     for pc in body.problems:
         try:
-            await _create_problem_with_cases(course_id, current_user.id, pc, db)
+            await _create_problem_with_cases(course_id, user_id, pc, db)
             await db.commit()
             imported_slugs.append(pc.slug)
         except HTTPException as exc:

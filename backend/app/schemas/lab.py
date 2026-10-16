@@ -16,6 +16,16 @@ class LabSessionCreate(BaseModel):
     problem_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
+class LabSessionUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=256)
+    description: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    mandatory_count: int | None = Field(default=None, ge=1)
+    is_active: bool | None = None
+    problem_ids: list[uuid.UUID] | None = None
+
+
 class LabSessionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
