@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProblems, ProblemSummary } from '../api/client'
 import { useTheme } from '../context/ThemeContext'
+import { useAuth } from '../context/AuthContext'
 
 export default function ProblemListPage() {
   const [problems, setProblems] = useState<ProblemSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [solvedCount, setSolvedCount] = useState(0)
   const { theme, toggleTheme } = useTheme()
+  const { user, logout } = useAuth()
 
   useEffect(() => {
     getProblems()
@@ -51,14 +53,20 @@ export default function ProblemListPage() {
           </div>
         </div>
         <div className="flex items-center gap-4 text-sm">
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noreferrer"
-            className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-          >
-            GitHub
-          </a>
+          {/* User info */}
+          {user && (
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-xs font-bold text-orange-600 dark:text-orange-400">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-zinc-600 dark:text-zinc-400 text-xs font-medium hidden sm:block">
+                {user.name}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-mono uppercase border border-zinc-200 dark:border-zinc-700 hidden sm:inline">
+                {user.role}
+              </span>
+            </div>
+          )}
           <button
             onClick={toggleTheme}
             className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 transition-colors"
@@ -73,6 +81,13 @@ export default function ProblemListPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
               </svg>
             )}
+          </button>
+          <button
+            onClick={logout}
+            className="text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors text-xs font-medium"
+            aria-label="Logout"
+          >
+            Sign out
           </button>
         </div>
       </header>
@@ -110,14 +125,18 @@ export default function ProblemListPage() {
           </div>
 
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-5 flex flex-col gap-2 shadow-sm dark:shadow-none">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Active Language</span>
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Languages</span>
             <div className="flex items-center gap-2 mt-1">
               <div className="w-6 h-6 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-semibold text-orange-600 dark:text-orange-400 font-mono border border-zinc-200/50 dark:border-transparent">
                 J
               </div>
               <span className="text-zinc-800 dark:text-white font-medium text-sm">Java 21</span>
+              <div className="w-6 h-6 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-semibold text-yellow-600 dark:text-yellow-400 font-mono border border-zinc-200/50 dark:border-transparent ml-1">
+                Py
+              </div>
+              <span className="text-zinc-800 dark:text-white font-medium text-sm">Python 3</span>
             </div>
-            <span className="text-zinc-500 dark:text-zinc-400 text-xs mt-1">C++ and Python coming in Phase 2</span>
+            <span className="text-zinc-500 dark:text-zinc-400 text-xs mt-1">Sandboxed Docker execution</span>
           </div>
 
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-5 flex flex-col gap-2 shadow-sm dark:shadow-none">
