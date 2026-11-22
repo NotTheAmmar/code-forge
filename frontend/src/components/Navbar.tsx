@@ -58,17 +58,7 @@ export default function Navbar({ customTitle, backTo, backLabel }: NavbarProps) 
                 : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
             }`}
           >
-            Courses
-          </Link>
-          <Link
-            to="/practice"
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
-              location.pathname === '/practice' || location.pathname.startsWith('/problems')
-                ? 'text-orange-600 dark:text-orange-400 bg-orange-500/10'
-                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-            }`}
-          >
-            Practice
+            My Courses
           </Link>
         </nav>
       </div>

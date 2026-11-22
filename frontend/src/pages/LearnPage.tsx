@@ -65,7 +65,7 @@ export default function LearnPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans transition-colors">
       <Navbar
         customTitle={course?.title ? `${course.title} (Curriculum)` : 'Learning Path'}
-        backTo={courseId ? `/courses/${courseId}` : '/'}
+        backTo={courseId ? `/courses/${courseId}?tab=learn` : '/'}
         backLabel="Course"
       />
 

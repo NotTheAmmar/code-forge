@@ -81,7 +81,7 @@ export default function LabDashboardPage() {
       {/* Header */}
       <Navbar
         customTitle={lab?.title ? `${lab.title} (Live Dashboard)` : 'Lab Dashboard'}
-        backTo={lab ? `/courses/${lab.course_id}` : '/'}
+        backTo={lab ? `/courses/${lab.course_id}?tab=labs` : '/'}
         backLabel="Course"
       />
 

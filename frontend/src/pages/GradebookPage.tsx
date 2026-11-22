@@ -60,7 +60,7 @@ export default function GradebookPage() {
       {/* Header */}
       <Navbar
         customTitle="Gradebook"
-        backTo={courseId ? `/courses/${courseId}` : '/'}
+        backTo={courseId ? `/courses/${courseId}?tab=gradebook` : '/'}
         backLabel="Course"
       />
 

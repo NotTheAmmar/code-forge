@@ -40,7 +40,7 @@ export default function AITutorPanel({
     {
       id: 'welcome',
       sender: 'tutor',
-      text: `👋 Hi! I'm your **CodeForge AI Tutor** for **${problemTitle}**.\n\nI can help you understand the problem's underlying logic, think through algorithmic steps, or clarify language syntax.\n\n*(Note: To help you learn, I guide your thinking rather than writing the solution code for you!)*`,
+      text: `👋 Hi! I'm your **CodeForge AI Tutor** for **${problemTitle}**.\n\nI can help you understand the problem's underlying logic, think through algorithmic steps, or clarify language syntax.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ])
@@ -114,7 +114,7 @@ export default function AITutorPanel({
                 {currentLanguage.toUpperCase()}
               </span>
             </h2>
-            <p className="text-[11px] text-zinc-500">Conceptual logic & edge cases (no direct solutions)</p>
+            <p className="text-[11px] text-zinc-500">Conceptual logic & edge cases</p>
           </div>
         </div>
 
@@ -203,7 +203,6 @@ export default function AITutorPanel({
             />
             <span>Include current editor code context</span>
           </label>
-          <span className="text-[10px] text-zinc-400">Strictly no solution code policy</span>
         </div>
 
         <form

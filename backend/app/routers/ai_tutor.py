@@ -137,9 +137,7 @@ def _generate_offline_pedagogical_guidance(
         f"{intuition}\n\n"
         f"{edge_cases}"
         f"{syntax_note}"
-        f"{code_feedback}\n\n"
-        f"---\n"
-        f"*💡 Tip: To enable real-time interactive Gemini AI responses, add `GEMINI_API_KEY=your_key` to `.env` (Free tier at [Google AI Studio](https://aistudio.google.com)).*"
+        f"{code_feedback}"
     )
 
 
@@ -194,8 +192,12 @@ async def ask_ai_tutor(
             f"Student Question / Request:\n{body.message}"
         )
 
-        model_name = settings.gemini_model.strip() or "gemini-2.5-flash"
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        primary_model = settings.gemini_model.strip() or "gemini-2.5-flash"
+        models_to_try = [primary_model]
+        for fallback in ["gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-2.5-flash"]:
+            if fallback not in models_to_try:
+                models_to_try.append(fallback)
+
         gemini_payload = {
             "system_instruction": {
                 "parts": [{"text": SYSTEM_PROMPT}]
@@ -214,20 +216,27 @@ async def ask_ai_tutor(
 
         try:
             async with httpx.AsyncClient(timeout=12.0) as client:
-                resp = await client.post(gemini_url, json=gemini_payload)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                        if text:
-                            return AITutorResponse(
-                                reply=text.strip(),
-                                model=model_name,
-                                is_live=True,
-                            )
-                else:
-                    logger.warning("Gemini API returned status %d: %s", resp.status_code, resp.text[:200])
+                for candidate_model in models_to_try:
+                    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{candidate_model}:generateContent?key={api_key}"
+                    resp = await client.post(gemini_url, json=gemini_payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        candidates = data.get("candidates", [])
+                        if candidates:
+                            text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                            if text:
+                                return AITutorResponse(
+                                    reply=text.strip(),
+                                    model=candidate_model,
+                                    is_live=True,
+                                )
+                    else:
+                        logger.warning(
+                            "Gemini API candidate %s returned status %d: %s",
+                            candidate_model,
+                            resp.status_code,
+                            resp.text[:200],
+                        )
         except Exception as exc:
             logger.warning("Gemini API call failed (%s); falling back to offline tutor", exc)
 

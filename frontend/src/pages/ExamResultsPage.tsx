@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   getExamResults,
   ExamResultsDashboard,
   ExamStudentResult,
 } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 
 export default function ExamResultsPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [results, setResults] = useState<ExamResultsDashboard | null>(null)
   const [loading, setLoading] = useState(true)
@@ -17,6 +20,12 @@ export default function ExamResultsPage() {
 
   useEffect(() => {
     if (!id) return
+    // If student, route to student-specific exam outcome
+    if (user?.role === 'student') {
+      navigate(`/exams/${id}/my-result`, { replace: true })
+      return
+    }
+
     setLoading(true)
     getExamResults(id)
       .then((data) => {
@@ -28,7 +37,7 @@ export default function ExamResultsPage() {
         setError('Failed to load exam results.')
         setLoading(false)
       })
-  }, [id])
+  }, [id, user, navigate])
 
   const toggleExpand = (userId: string) => {
     setExpandedStudentId((prev) => (prev === userId ? null : userId))
@@ -38,9 +47,9 @@ export default function ExamResultsPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans transition-colors">
       {/* Header */}
       <Navbar
-        customTitle={results?.title ? `${results.title} (Results)` : 'Exam Audit'}
-        backTo="/"
-        backLabel="Dashboard"
+        customTitle={results?.title ? `${results.title} (Results & Audit)` : 'Exam Audit'}
+        backTo={results?.course_id ? `/courses/${results.course_id}?tab=exams` : '/'}
+        backLabel="Course"
       />
 
       {/* Main Content */}

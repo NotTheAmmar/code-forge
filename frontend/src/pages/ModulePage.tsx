@@ -244,16 +244,13 @@ export default function ModulePage() {
                   <div className="pt-2">
                     <Link
                       to={
-                        activeContent.problem_id === 'two-sum-id'
-                          ? '/problems/two-sum'
-                          : activeContent.problem_id === 'fizzbuzz-id'
-                          ? '/problems/fizzbuzz'
-                          : '/problems/hello-world'
+                        activeContent.problem_id
+                          ? `/problems/${activeContent.problem_id}?courseId=${module.course_id}&moduleId=${module.id}`
+                          : `/courses/${module.course_id}?tab=problems`
                       }
-                      target="_blank"
                       className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-semibold transition-all shadow-md"
                     >
-                      <span>Open in CodeForge IDE ↗</span>
+                      <span>Open in CodeForge IDE →</span>
                     </Link>
                   </div>
                 </div>

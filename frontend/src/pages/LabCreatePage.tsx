@@ -76,7 +76,7 @@ export default function LabCreatePage() {
       {/* Header */}
       <Navbar
         customTitle="Create Lab Session"
-        backTo={courseId ? `/courses/${courseId}` : '/'}
+        backTo={courseId ? `/courses/${courseId}?tab=labs` : '/'}
         backLabel="Course"
       />
 

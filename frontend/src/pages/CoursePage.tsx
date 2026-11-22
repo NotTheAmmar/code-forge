@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   getCourse,
   getCourseProblems,
@@ -20,10 +20,15 @@ import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 
 type Tab = 'problems' | 'learn' | 'labs' | 'exams' | 'gradebook' | 'analytics'
+const VALID_TABS: Tab[] = ['problems', 'learn', 'labs', 'exams', 'gradebook', 'analytics']
 
 export default function CoursePage() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const tabParam = searchParams.get('tab') as Tab | null
+  const initialTab: Tab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'problems'
 
   const [course, setCourse] = useState<CourseResponse | null>(null)
   const [problems, setProblems] = useState<ProblemSummary[]>([])
@@ -31,9 +36,25 @@ export default function CoursePage() {
   const [modules, setModules] = useState<LearningModule[]>([])
   const [exams, setExams] = useState<Exam[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('problems')
+  const [tab, setTabState] = useState<Tab>(initialTab)
   const [showCode, setShowCode] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  const setTab = (newTab: Tab) => {
+    setTabState(newTab)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('tab', newTab)
+      return next
+    }, { replace: true })
+  }
+
+  useEffect(() => {
+    const t = searchParams.get('tab') as Tab
+    if (t && VALID_TABS.includes(t)) {
+      setTabState(t)
+    }
+  }, [searchParams])
 
   // Modals for instructor
   const [showAddProblem, setShowAddProblem] = useState(false)
@@ -354,7 +375,7 @@ export default function CoursePage() {
                 {problems.map((p) => {
                   const solved = isSolved(p.slug)
                   return (
-                    <Link key={p.id} to={`/problems/${p.slug}`} className="flex items-center justify-between px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
+                    <Link key={p.id} to={`/problems/${p.slug}?courseId=${id}`} className="flex items-center justify-between px-6 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors group">
                       <div className="flex items-center gap-4">
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${solved ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'border-zinc-200 dark:border-zinc-700 text-zinc-400'}`}>
                           {solved ? '✓' : '·'}
@@ -564,12 +585,19 @@ export default function CoursePage() {
                       >
                         Audit & Results →
                       </Link>
+                    ) : exam.session_status === 'submitted' ? (
+                      <Link
+                        to={`/exams/${exam.id}/my-result`}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                      >
+                        View Result →
+                      </Link>
                     ) : (
                       <Link
                         to={`/exams/${exam.id}`}
                         className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold shadow-sm transition"
                       >
-                        Enter Exam →
+                        {exam.session_status === 'in_progress' ? 'Resume Exam →' : 'Enter Exam →'}
                       </Link>
                     )}
                   </div>

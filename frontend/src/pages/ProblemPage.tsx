@@ -119,6 +119,8 @@ export default function ProblemPage() {
   const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
   const labId = searchParams.get('lab')
+  const courseIdParam = searchParams.get('courseId')
+  const moduleId = searchParams.get('moduleId')
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null)
   const [code, setCode] = useState<string>('')
@@ -338,8 +340,24 @@ export default function ProblemPage() {
       {/* Header */}
       <Navbar
         customTitle={problem?.title || 'Loading...'}
-        backTo={labId ? `/labs/${labId}` : "/"}
-        backLabel={labId ? 'Back to Lab' : 'Problems'}
+        backTo={
+          labId
+            ? `/labs/${labId}`
+            : moduleId
+            ? `/modules/${moduleId}`
+            : courseIdParam || problem?.course_id
+            ? `/courses/${courseIdParam || problem?.course_id}?tab=problems`
+            : '/'
+        }
+        backLabel={
+          labId
+            ? 'Lab'
+            : moduleId
+            ? 'Module'
+            : courseIdParam || problem?.course_id
+            ? 'Course'
+            : 'Courses'
+        }
       />
 
       {/* Split Pane Workspace */}

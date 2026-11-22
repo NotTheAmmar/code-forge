@@ -143,6 +143,7 @@ class ExamStudentResult(BaseModel):
 
 class ExamResultsDashboard(BaseModel):
     exam_id: uuid.UUID
+    course_id: uuid.UUID | None = None
     title: str
     total_enrolled: int
     submissions_count: int
@@ -152,6 +153,7 @@ class ExamResultsDashboard(BaseModel):
 
 class ExamMyResultResponse(BaseModel):
     exam_id: uuid.UUID
+    course_id: uuid.UUID | None = None
     total_score: int
     submitted_at: datetime | None = None
     is_auto_submitted: bool = False

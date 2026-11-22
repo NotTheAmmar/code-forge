@@ -55,7 +55,7 @@ export default function AnalyticsPage() {
       {/* Header */}
       <Navbar
         customTitle={course?.title ? `${course.title} (Analytics)` : 'Course Analytics'}
-        backTo={courseId ? `/courses/${courseId}` : '/'}
+        backTo={courseId ? `/courses/${courseId}?tab=analytics` : '/'}
         backLabel="Course"
       />
 

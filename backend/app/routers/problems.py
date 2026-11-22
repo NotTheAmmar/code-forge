@@ -53,12 +53,20 @@ async def list_problems(db: AsyncSession = Depends(get_db)) -> list[Problem]:
 
 # ── GET /problems/{slug} ──────────────────────────────────────────────────────
 
+def _problem_where(slug_or_id: str):
+    try:
+        val = uuid.UUID(slug_or_id)
+        return Problem.id == val
+    except ValueError:
+        return Problem.slug == slug_or_id
+
+
 @router.get("/{slug}", response_model=ProblemDetail)
 async def get_problem(slug: str, db: AsyncSession = Depends(get_db)) -> Problem:
     """Return full problem detail including all test cases and starter code."""
     result = await db.execute(
         select(Problem)
-        .where(Problem.slug == slug)
+        .where(_problem_where(slug))
         .options(selectinload(Problem.test_cases))
     )
     problem = result.scalar_one_or_none()
@@ -270,7 +278,7 @@ async def run_custom_code(
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _get_problem_or_404(slug: str, db: AsyncSession) -> Problem:
-    result = await db.execute(select(Problem).where(Problem.slug == slug))
+    result = await db.execute(select(Problem).where(_problem_where(slug)))
     problem = result.scalar_one_or_none()
     if problem is None:
         raise HTTPException(

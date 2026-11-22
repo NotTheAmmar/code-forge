@@ -68,6 +68,10 @@ export default function ExamPage() {
     setLoading(true)
     getExamDetail(id)
       .then((data) => {
+        if (data.session_status === 'submitted') {
+          navigate(`/exams/${id}/my-result`, { replace: true })
+          return
+        }
         setExam(data)
         if (data.problems) {
           setProblems(data.problems)

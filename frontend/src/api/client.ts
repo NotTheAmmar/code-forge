@@ -334,6 +334,7 @@ export interface ExamStudentResult {
 
 export interface ExamResultsDashboard {
   exam_id: string
+  course_id?: string
   title: string
   total_enrolled: number
   submissions_count: number
@@ -343,6 +344,7 @@ export interface ExamResultsDashboard {
 
 export interface ExamMyResult {
   exam_id: string
+  course_id?: string
   total_score: number
   submitted_at: string
   is_auto_submitted: boolean

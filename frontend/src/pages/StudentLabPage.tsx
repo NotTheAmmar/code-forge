@@ -75,7 +75,7 @@ export default function StudentLabPage() {
       {/* Header */}
       <Navbar
         customTitle={lab.title}
-        backTo={`/courses/${lab.course_id}`}
+        backTo={`/courses/${lab.course_id}?tab=labs`}
         backLabel="Course"
       />
 

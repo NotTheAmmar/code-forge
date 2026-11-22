@@ -30,8 +30,8 @@ export default function ExamMyResultPage() {
       {/* Header */}
       <Navbar
         customTitle="Assessment Outcome"
-        backTo="/"
-        backLabel="Dashboard"
+        backTo={result?.course_id ? `/courses/${result.course_id}?tab=exams` : '/'}
+        backLabel="Course"
       />
 
       {/* Main Content */}
@@ -98,10 +98,10 @@ export default function ExamMyResultPage() {
             </div>
 
             <Link
-              to="/"
+              to={result?.course_id ? `/courses/${result.course_id}?tab=exams` : '/'}
               className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition shadow-md"
             >
-              Back to Home Dashboard →
+              Return to Course Exams →
             </Link>
           </div>
         )}

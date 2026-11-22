@@ -118,7 +118,7 @@ export default function ExamCreatePage() {
         })),
       })
 
-      navigate(`/courses/${courseId}`)
+      navigate(`/courses/${courseId}?tab=exams`)
     } catch (err) {
       console.error(err)
       setError('Failed to create proctored exam.')
@@ -132,7 +132,7 @@ export default function ExamCreatePage() {
       {/* Header */}
       <Navbar
         customTitle="Create Proctored Exam"
-        backTo={`/courses/${courseId}`}
+        backTo={`/courses/${courseId}?tab=exams`}
         backLabel="Course"
       />
 
