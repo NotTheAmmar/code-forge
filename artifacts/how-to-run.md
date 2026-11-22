@@ -77,53 +77,88 @@ Once services are running, access the platform at:
 Running `python manage.py seed` populates an entire realistic academic semester environment:
 
 ### 1. User Accounts (Password for all: `changeme`)
-- **Instructor:**
-  - `admin@codeforge.local` ("Admin Instructor") — Course creator, author of all problems, lab sessions, learning modules, exams, and viewer of instructor analytics & audit logs.
-- **Students:**
-  - `student@codeforge.local` ("Alex Student") — **Demo Hero Account**. Baseline student who has solved only the mandatory problem (`hello-world`). Solving any 2nd problem (`two-sum`) live during the presentation immediately earns a badge!
-  - `diana@codeforge.local` ("Diana Prince") — Top student (4 solved, 3 badges, 100% on midterm, 0 violations).
-  - `alice@codeforge.local` ("Alice Johnson") — Strong student (3 solved, 2 badges, Module 1 completed, 1 exam violation).
-  - `bob@codeforge.local` ("Bob Smith") — In-progress student (2 solved, 1 badge, active exam session with 2 violations).
+- **Instructors:**
+  - `admin@codeforge.local` ("Admin Instructor") — System Administrator & Faculty Head (enrolled in CS101, CS201, CS301).
+  - `prof.chen@codeforge.local` ("Prof. Alan Chen") — Associate Professor of Algorithms (CS201, MATH150).
+  - `dr.stone@codeforge.local` ("Dr. Elena Stone") — Systems Programming & Architecture Faculty (CS301).
+- **Students (12 total accounts):**
+  - `student@codeforge.local` ("Alex Student") — **Demo Hero Account**. Fresh baseline student who has solved only the mandatory problem (`hello-world`) in Lab 1. Solving a 2nd problem (`two-sum`) live during the presentation immediately earns a badge! In exams, Alex has not started yet, so you can test starting exams cleanly.
+  - `diana@codeforge.local` ("Diana Prince") — Top student (Rank 1 on Leaderboard: 5 solved, 4 badges in Lab 1, 100% on midterm, 0 violations).
+  - `alice@codeforge.local` ("Alice Johnson") — Strong student (4 solved, 3 badges, Module progress completed, 1 exam violation).
+  - `bob@codeforge.local` ("Bob Smith") — In-progress student (3 solved, 2 badges, active exam session with 2 violations).
+  - `evan@codeforge.local` ("Evan Wright") — 2 solved, 1 badge in Lab 1, enrolled in CS201.
+  - `fiona@codeforge.local` ("Fiona Gallagher") — 2 solved, 1 badge in Lab 1, 2 exam violations (`focus_loss`, `copy_paste`).
+  - `george@codeforge.local` ("George Clark") — Enrolled in CS101 & CS201 (CS201 midterm 70% with 1 violation).
+  - `hannah@codeforge.local` ("Hannah Abbott") — Baseline student (1 solved, 0 badges).
+  - `ian@codeforge.local` ("Ian Malcolm") — CS301 systems student (solved bitwise-parity).
+  - `julia@codeforge.local` ("Julia Roberts") — CS101 & CS301 student.
+  - `kevin@codeforge.local` ("Kevin Mitnick") — Systems hacker (CS301 exam 100% with 2 violations: `fullscreen_exit`, `focus_loss`).
   - `charlie@codeforge.local` ("Charlie Brown") — Baseline student (1 solved, 0 badges).
 
-### 2. Course
-- **CS101: Introduction to Programming**
-  - Invite Code: `CS101A`
-  - Created by Admin Instructor, with all 5 students enrolled.
+### 2. Courses (4 Distinct Academic Curricula)
+1. **CS101: Introduction to Programming** (Invite Code: `CS101A`)
+   - Foundational programming paradigms, algorithm formulation, standard I/O, and control flow in Python, Java, C, and C++.
+2. **CS201: Data Structures & Algorithms** (Invite Code: `CS201B`)
+   - Algorithmic complexity, asymptotic analysis, search invariants, divide & conquer, and dynamic memory structures.
+3. **CS301: Systems & Low-Level C/C++ Programming** (Invite Code: `CS301C`)
+   - Low-level systems programming, pointer mechanics, manual memory layout, bitwise manipulation, and system boundaries.
+4. **MATH150: Discrete Mathematics for CS** (Invite Code: `M150D`)
+   - Mathematical foundations for computer science: propositional logic, bitwise parity, modular arithmetic, and recurrence relations.
 
-### 3. Problems (with Python, Java, C, and C++ Starters)
-- `hello-world`: String input/output formatting. 3 test cases (2 visible, 1 hidden).
-- `two-sum`: Array index target search. 3 test cases (2 visible, 1 hidden).
-- `reverse-string`: String reversal logic. 3 test cases (2 visible, 1 hidden).
-- `fizzbuzz`: 3/5 division logic. 2 test cases (1 visible, 1 hidden).
+### 3. Problem Catalog (11 Problems with Python, Java, C, and C++ Starters)
+- **CS101 Problems:**
+  - `hello-world` (Easy): Stdin/stdout greeting formatting.
+  - `two-sum` (Easy): Array index target search.
+  - `reverse-string` (Easy): String reversal logic.
+  - `fizzbuzz` (Easy): 3/5/15 multiples handling.
+  - `palindrome-number` (Easy): Integer palindrome check.
+- **CS201 Problems:**
+  - `valid-palindrome` (Easy): Alphanumeric palindrome filtering.
+  - `binary-search` (Medium): Logarithmic O(log n) sorted array search.
+  - `merge-sorted-arrays` (Medium): Two-pointer linear array combination.
+  - `maximum-subarray` (Medium): Kadane's dynamic algorithm for contiguous subarray sum.
+- **CS301 / MATH150 Problems:**
+  - `bitwise-parity` (Easy): 32-bit integer parity bit computation.
+  - `pointer-swap-reverse` (Medium): In-place array traversal & reversal.
 
-### 4. Lab Sessions & Gamified Badges
-- **"Lab 1: Programming Basics & Warm-up"**: Active lab session with 1 mandatory problem requirement.
-- Badges awarded when students exceed the mandatory threshold:
-  - Diana: 3 badges ⭐⭐⭐
-  - Alice: 2 badges ⭐⭐
-  - Bob: 1 badge ⭐
-  - Charlie: 0 badges
-  - Alex Student: 0 badges (primed for live presentation demo).
+### 4. Lab Sessions (4 Sessions Across Courses)
+- **CS101: "Lab 1: Programming Basics & Warm-up"** (Active, mandatory: 1 problem):
+  - Pre-seeded badges awarded for solving beyond mandatory:
+    - Diana: 4 badges ⭐⭐⭐⭐
+    - Alice: 3 badges ⭐⭐⭐
+    - Bob: 2 badges ⭐⭐
+    - Evan, Fiona, Kevin: 1 badge each ⭐
+    - Charlie, Hannah, Ian, Julia, Alex: 0 badges
+- **CS201: "Lab 2: Searching & Pointer Invariants"** (Active, mandatory: 2 problems)
+- **CS301: "Lab 3: C/C++ Memory & Bitwise Lab"** (Active, mandatory: 1 problem)
+- **CS101: "Lab 0: Diagnostic Orientation"** (Closed / Archived baseline lab)
 
-### 5. Interactive Learning Modules
-- **Module 1: "Introduction to Python & Algorithms"** (Published):
-  - *Theory:* Markdown guide on Python dynamic typing and object references.
-  - *Video:* Embedded YouTube masterclass (`kqtD5dpn9C8`).
-  - *Practice:* Interactive challenge linked directly to `hello-world`.
-- **Module 2: "Algorithmic Thinking & Control Flow"** (Published):
-  - *Theory:* Markdown guide on branching invariants and edge-case handling.
-  - *Video:* Embedded YouTube lecture on loop invariants (`6iF8Xb7Z3wQ`).
-  - *Practice:* Interactive challenge linked directly to `fizzbuzz`.
+### 5. Interactive Learning Modules (6 Modules Across Courses)
+- **CS101 Module 1:** "Introduction to Python & Algorithms" (Theory + YouTube video + `hello-world`)
+- **CS101 Module 2:** "Algorithmic Thinking & Control Flow" (Theory + YouTube video + `fizzbuzz`)
+- **CS101 Module 3:** "String Mechanics & Reversal" (Theory + `reverse-string`)
+- **CS201 Module 1:** "Asymptotic Analysis & Binary Search" (Theory + YouTube video + `binary-search`)
+- **CS201 Module 2:** "Divide & Conquer and Subarray Invariants" (Theory + `merge-sorted-arrays`)
+- **CS301 Module 1:** "Computer Architecture & Bitwise Logic" (Theory + `bitwise-parity`)
 
-### 6. Proctored Exam & Anti-Cheat Engine
-- **"CS101 Midterm Proctored Assessment"**:
-  - 60-minute duration, full-screen lockdown enforcement, copy/paste blocking, tab-switch limit of 3.
-  - Weighted problems: `hello-world` (50 pts) + `two-sum` (50 pts).
+### 6. Proctored Exams & Anti-Cheat Engine (4 Assessments)
+- **"CS101 Midterm Proctored Assessment"** (Active window, 60 mins):
+  - Problems: `hello-world` (40 pts) + `two-sum` (60 pts).
   - Pre-seeded Sessions:
     - Diana: 100/100 points, 0 violations.
     - Alice: 100/100 points, 1 violation (`tab_switch` recorded).
-    - Bob: In-progress session with 2 recorded violations (`tab_switch`, `fullscreen_exit`) for instructor audit review.
+    - Fiona: 100/100 points, 2 violations (`focus_loss`, `copy_paste`).
+    - Evan: 40/100 points, 0 violations.
+    - Bob: In-progress session with 2 violations (`tab_switch`, `fullscreen_exit`).
+    - Alex Student: Ready to be taken live during demo!
+- **"CS101 Final Assessment: Problem Solving Mastery"** (Scheduled future window, 90 mins).
+- **"CS201 Midterm: Algorithmic Efficiency & Searching"** (Active window, 75 mins, George Clark session).
+- **"CS301 Practical Systems Exam: Memory & Bitwise Ops"** (Active window, 90 mins, Kevin Mitnick session with violations).
+
+### 7. Socratic AI Programming Tutor (Pedagogical Guidance)
+- Embedded in the Problem Solving view (non-exam sessions).
+- Uses Google Gemini Flash (or intelligent offline fallback).
+- Guiding principle: **Never generates full solutions or direct code blocks**; guides students with targeted hints, conceptual explanations, and edge-case questions.
 
 ---
 
@@ -226,7 +261,7 @@ docker compose exec api python manage.py seed
 # Check service health and status
 ./codeforge-setup.sh --status
 
-# Run all 145 automated tests
+# Run all 149 automated tests
 ./codeforge-setup.sh --test
 
 # Re-seed database demo data (idempotent)

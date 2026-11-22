@@ -79,13 +79,17 @@ The database comes pre-seeded with instructor and student accounts, the **CS101:
 
 | Role | Email | Password | Details |
 |---|---|---|---|
-| **Instructor** | `admin@codeforge.local` | `changeme` | Course instructor; full management, grading & audit access |
-| **Student** | `student@codeforge.local` | `changeme` | "Alex Student" — ready for live coding, badge earning & exams |
-| **Student** | `diana@codeforge.local` | `changeme` | "Diana Prince" — Leaderboard leader (3 badges, completed modules) |
-| **Student** | `alice@codeforge.local` | `changeme` | "Alice Johnson" — 2 badges earned |
-| **Student** | `bob@codeforge.local` | `changeme` | "Bob Smith" — 1 badge earned |
+| **Instructor** | `admin@codeforge.local` | `changeme` | Admin Instructor; full management, grading & audit across CS101, CS201, CS301 |
+| **Instructor** | `prof.chen@codeforge.local` | `changeme` | Prof. Alan Chen; Algorithms & Discrete Math faculty (CS201, MATH150) |
+| **Instructor** | `dr.stone@codeforge.local` | `changeme` | Dr. Elena Stone; Systems Programming faculty (CS301) |
+| **Student** | `student@codeforge.local` | `changeme` | "Alex Student" — clean baseline for live coding, badge earning & exams |
+| **Student** | `diana@codeforge.local` | `changeme` | "Diana Prince" — Leaderboard leader (4 badges, completed modules, 100% exam) |
+| **Student** | `alice@codeforge.local` | `changeme` | "Alice Johnson" — 3 badges earned, exam completed with 1 violation |
+| **Student** | `bob@codeforge.local` | `changeme` | "Bob Smith" — 2 badges earned, active exam with 2 violations |
+| **Student** | `kevin@codeforge.local` | `changeme` | "Kevin Mitnick" — Systems hacker (CS301 exam 100% with violations) |
+| **Student** | `evan@, fiona@, george@, hannah@, ian@, julia@, charlie@` | `changeme` | Additional students enrolled across courses & labs |
 
-*Invite Code for CS101:* `CS101A`
+*Course Invite Codes:* `CS101A` (CS101), `CS201B` (CS201), `CS301C` (CS301), `M150D` (MATH150)
 
 ---
 
@@ -142,7 +146,7 @@ code-forge/
 
 ## 🧪 Automated Testing
 
-CodeForge maintains a 100% test pass rate across 145 automated tests verifying every subsystem:
+CodeForge maintains a 100% test pass rate across 149 automated tests verifying every subsystem:
 
 ```bash
 # Run all tests in the API container
