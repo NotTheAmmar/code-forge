@@ -152,7 +152,7 @@ export default function AITutorPanel({
               <span className="text-[10px] text-zinc-500">{m.timestamp}</span>
               {m.model && (
                 <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
-                  {m.model}
+                  {m.model === 'offline-socratic' ? 'Socratic AI' : m.model}
                 </span>
               )}
             </div>

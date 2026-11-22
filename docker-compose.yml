@@ -23,6 +23,9 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - PYTHONPATH=/app
     volumes:
       - ./backend:/app
@@ -55,6 +58,9 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - PYTHONPATH=/app
     volumes:
       - ./backend:/app

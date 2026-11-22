@@ -238,7 +238,47 @@ async def ask_ai_tutor(
                             resp.text[:200],
                         )
         except Exception as exc:
-            logger.warning("Gemini API call failed (%s); falling back to offline tutor", exc)
+            logger.warning("Gemini API call failed (%s); falling back to secondary providers", exc)
+
+    # ── 3B. Try Groq if configured ───────────────────────────────────────────
+    groq_key = settings.groq_api_key.strip()
+    if groq_key:
+        code_snippet = f"\n\nStudent's Current Code ({body.language}):\n```\n{body.source_code}\n```" if body.source_code else ""
+        user_prompt = (
+            f"Problem: {problem.title} (Difficulty: {problem.difficulty})\n"
+            f"Description:\n{problem.description[:1500]}\n"
+            f"Language: {body.language or 'general'}"
+            f"{code_snippet}\n\n"
+            f"Student Question / Request:\n{body.message}"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key}"},
+                    json={
+                        "model": "llama-3.3-70b-versatile",
+                        "messages": [
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "temperature": 0.4,
+                        "max_tokens": 800,
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        text = choices[0].get("message", {}).get("content", "")
+                        if text:
+                            return AITutorResponse(
+                                reply=text.strip(),
+                                model="llama-3.3-70b",
+                                is_live=True,
+                            )
+        except Exception as exc:
+            logger.warning("Groq API call failed (%s)", exc)
 
     # ── 4. Fallback Socratic Guidance Engine ──────────────────────────────────
     offline_reply = _generate_offline_pedagogical_guidance(
@@ -249,6 +289,6 @@ async def ask_ai_tutor(
     )
     return AITutorResponse(
         reply=offline_reply,
-        model="offline-socratic",
+        model="Socratic AI",
         is_live=False,
     )
