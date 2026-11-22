@@ -480,13 +480,20 @@ export const getProblem = (slug: string): Promise<ProblemDetail> =>
 
 // ── Course API ────────────────────────────────────────────────────────────────
 
+// ── Course API ────────────────────────────────────────────────────────────────
+
 export interface CourseResponse {
   id: string
   title: string
-  description: string
+  description: string | null
+  invite_code: string
   join_code: string
+  created_by: string
   instructor_id: string
   instructor_name?: string
+  role?: string
+  member_count?: number
+  problem_count?: number
   created_at: string
 }
 
@@ -562,210 +569,265 @@ export interface LabGradeResult {
   badges_earned: number
 }
 
-// ── Mock Course / Lab Data ────────────────────────────────────────────────────
-
-const MOCK_COURSES: CourseResponse[] = [
-  {
-    id: 'course-1',
-    title: 'Data Structures & Algorithms',
-    description: 'Learn fundamental data structures and algorithms with hands-on coding exercises in Java and Python.',
-    join_code: 'DSA2024',
-    instructor_id: 'mock-instructor-1',
-    instructor_name: 'Admin Instructor',
-    created_at: '2024-09-01T00:00:00Z',
-  },
-  {
-    id: 'course-2',
-    title: 'Introduction to Programming',
-    description: 'A beginner-friendly course covering basic programming concepts using Java and Python.',
-    join_code: 'INTRO101',
-    instructor_id: 'mock-instructor-1',
-    instructor_name: 'Admin Instructor',
-    created_at: '2024-09-15T00:00:00Z',
-  },
-]
-
-const MOCK_LAB_SESSIONS: LabSessionDetail[] = [
-  {
-    id: 'lab-1',
-    course_id: 'course-1',
-    title: 'Lab 1: Arrays & Strings',
-    topic: 'Arrays',
-    starts_at: new Date(Date.now() - 3600000).toISOString(),
-    ends_at: new Date(Date.now() + 3600000).toISOString(),
-    is_active: true,
-    problem_count: 3,
-    mandatory_count: 1,
-    problems: [
-      { problem_id: 'two-sum-id', problem_slug: 'two-sum', problem_title: 'Two Sum', is_mandatory: true, order_index: 1, difficulty: 'easy' },
-      { problem_id: 'hello-world-id', problem_slug: 'hello-world', problem_title: 'Hello World', is_mandatory: false, order_index: 2, difficulty: 'easy' },
-      { problem_id: 'fizzbuzz-id', problem_slug: 'fizzbuzz', problem_title: 'FizzBuzz', is_mandatory: false, order_index: 3, difficulty: 'easy' },
-    ],
-  },
-  {
-    id: 'lab-2',
-    course_id: 'course-1',
-    title: 'Lab 2: Sorting Algorithms',
-    topic: 'Sorting',
-    starts_at: '2024-10-01T10:00:00Z',
-    ends_at: '2024-10-01T12:00:00Z',
-    is_active: false,
-    problem_count: 2,
-    mandatory_count: 1,
-    problems: [
-      { problem_id: 'fizzbuzz-id', problem_slug: 'fizzbuzz', problem_title: 'FizzBuzz', is_mandatory: true, order_index: 1, difficulty: 'easy' },
-      { problem_id: 'hello-world-id', problem_slug: 'hello-world', problem_title: 'Hello World', is_mandatory: false, order_index: 2, difficulty: 'easy' },
-    ],
-  },
-]
-
 // ── Course API Functions ──────────────────────────────────────────────────────
 
+const normalizeCourse = (c: any): CourseResponse => ({
+  id: c.id,
+  title: c.title,
+  description: c.description || '',
+  invite_code: c.invite_code || c.join_code || '',
+  join_code: c.join_code || c.invite_code || '',
+  created_by: c.created_by || c.instructor_id || '',
+  instructor_id: c.instructor_id || c.created_by || '',
+  instructor_name: c.instructor_name || 'Admin Instructor',
+  role: c.role || c.user_role,
+  member_count: c.member_count ?? 0,
+  problem_count: c.problem_count ?? 0,
+  created_at: c.created_at || new Date().toISOString(),
+})
+
 export const getCourses = (): Promise<CourseResponse[]> =>
-  apiClient.get<CourseResponse[]>('/courses').then((r) => r.data)
-    .catch(() => { console.warn('[Mock] courses'); return MOCK_COURSES })
+  apiClient.get<CourseResponse[]>('/courses').then((r) => r.data.map(normalizeCourse))
 
 export const getCourse = (id: string): Promise<CourseResponse> =>
-  apiClient.get<CourseResponse>(`/courses/${id}`).then((r) => r.data)
-    .catch(() => {
-      const c = MOCK_COURSES.find((c) => c.id === id)
-      if (!c) throw new Error('Course not found')
-      return c
-    })
+  apiClient.get<CourseResponse>(`/courses/${id}`).then((r) => normalizeCourse(r.data))
 
 export const createCourse = (data: { title: string; description: string }): Promise<CourseResponse> =>
-  apiClient.post<CourseResponse>('/courses', data).then((r) => r.data)
-    .catch(() => {
-      const c: CourseResponse = {
-        id: 'course-' + Math.random().toString(36).substring(2, 8),
-        ...data,
-        join_code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-        instructor_id: 'mock-instructor-1',
-        instructor_name: 'Admin Instructor',
-        created_at: new Date().toISOString(),
-      }
-      MOCK_COURSES.push(c)
-      return c
-    })
+  apiClient.post<CourseResponse>('/courses', data).then((r) => normalizeCourse(r.data))
 
 export const joinCourse = (joinCode: string): Promise<CourseResponse> =>
-  apiClient.post<CourseResponse>('/courses/join', { join_code: joinCode }).then((r) => r.data)
-    .catch(() => {
-      const c = MOCK_COURSES.find((c) => c.join_code.toLowerCase() === joinCode.toLowerCase())
-      if (!c) throw new Error('Invalid join code')
-      return c
+  apiClient
+    .post<CourseResponse>('/courses/join', {
+      join_code: joinCode.trim(),
+      invite_code: joinCode.trim(),
     })
+    .then((r) => normalizeCourse(r.data))
 
 export const getCourseProblems = (courseId: string): Promise<ProblemSummary[]> =>
   apiClient.get<ProblemSummary[]>(`/courses/${courseId}/problems`).then((r) => r.data)
-    .catch(() => {
-      console.warn('[Mock] course problems')
-      return MOCK_PROBLEMS.map(({ id, slug, title, difficulty, time_limit_sec, memory_limit_mb, created_at }) => ({
-        id, slug, title, difficulty, course_id: courseId, time_limit_sec, memory_limit_mb, created_at,
-      }))
-    })
+
+export interface TestCaseInput {
+  label: string
+  input_data: string
+  expected_output: string
+  is_visible: boolean
+  order_index?: number
+}
+
+export interface ProblemCreateInput {
+  slug: string
+  title: string
+  description: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  starter_code_java?: string
+  starter_code_python?: string
+  time_limit_sec?: number
+  memory_limit_mb?: number
+  test_cases: TestCaseInput[]
+}
+
+export const createProblem = (courseId: string, data: ProblemCreateInput): Promise<ProblemDetail> =>
+  apiClient.post<ProblemDetail>(`/courses/${courseId}/problems`, data).then((r) => r.data)
+
+export const bulkImportProblems = (
+  courseId: string,
+  problems: ProblemCreateInput[]
+): Promise<{ imported_count: number; failed_count: number; imported_slugs: string[]; errors: string[] }> =>
+  apiClient.post(`/courses/${courseId}/problems/bulk-import`, { problems }).then((r) => r.data)
 
 // ── Lab Session API Functions ─────────────────────────────────────────────────
 
 export const getCourseLabs = (courseId: string): Promise<LabSession[]> =>
-  apiClient.get<LabSession[]>(`/courses/${courseId}/lab-sessions`).then((r) => r.data)
-    .catch(() => {
-      console.warn('[Mock] course labs')
-      return MOCK_LAB_SESSIONS.filter((l) => l.course_id === courseId)
-    })
+  apiClient.get<any[]>(`/courses/${courseId}/labs`).then((r) =>
+    r.data.map((l) => ({
+      id: l.id,
+      course_id: l.course_id,
+      title: l.title,
+      topic: l.description || l.topic || 'Lab Session',
+      starts_at: l.starts_at || new Date().toISOString(),
+      ends_at: l.ends_at || new Date(Date.now() + 7 * 86400000).toISOString(),
+      is_active: l.is_active,
+      problem_count: l.problem_count ?? (l.problems ? l.problems.length : 0),
+      mandatory_count: l.mandatory_count ?? 1,
+    }))
+  )
 
 export const getLabSession = (id: string): Promise<LabSessionDetail> =>
-  apiClient.get<LabSessionDetail>(`/lab-sessions/${id}`).then((r) => r.data)
-    .catch(() => {
-      const l = MOCK_LAB_SESSIONS.find((l) => l.id === id)
-      if (!l) throw new Error('Lab session not found')
-      return l
-    })
+  apiClient.get<any>(`/labs/${id}`).then((r) => {
+    const l = r.data
+    return {
+      id: l.id,
+      course_id: l.course_id,
+      title: l.title,
+      topic: l.description || l.topic || 'Lab Session',
+      starts_at: l.starts_at || new Date().toISOString(),
+      ends_at: l.ends_at || new Date(Date.now() + 7 * 86400000).toISOString(),
+      is_active: l.is_active,
+      problem_count: l.problems ? l.problems.length : (l.problem_count ?? 0),
+      mandatory_count: l.mandatory_count ?? 1,
+      problems: (l.problems || []).map((p: any, idx: number) => ({
+        problem_id: p.id,
+        problem_slug: p.slug,
+        problem_title: p.title,
+        is_mandatory: idx < (l.mandatory_count ?? 1),
+        order_index: p.order_index ?? idx + 1,
+        difficulty: p.difficulty ?? 'easy',
+      })),
+    }
+  })
 
 export const createLabSession = (
   courseId: string,
-  data: { title: string; topic: string; starts_at: string; ends_at: string; problem_ids: { problem_id: string; is_mandatory: boolean }[] }
-): Promise<LabSessionDetail> =>
-  apiClient.post<LabSessionDetail>(`/courses/${courseId}/lab-sessions`, data).then((r) => r.data)
-    .catch(() => {
-      const lab: LabSessionDetail = {
-        id: 'lab-' + Math.random().toString(36).substring(2, 8),
-        course_id: courseId,
-        title: data.title,
-        topic: data.topic,
-        starts_at: data.starts_at,
-        ends_at: data.ends_at,
-        is_active: new Date(data.starts_at) <= new Date() && new Date() <= new Date(data.ends_at),
-        problem_count: data.problem_ids.length,
-        mandatory_count: data.problem_ids.filter((p) => p.is_mandatory).length,
-        problems: data.problem_ids.map((p, i) => {
-          const mp = MOCK_PROBLEMS.find((mp) => mp.id === p.problem_id)
-          return {
-            problem_id: p.problem_id,
-            problem_slug: mp?.slug ?? 'unknown',
-            problem_title: mp?.title ?? 'Unknown Problem',
-            is_mandatory: p.is_mandatory,
-            order_index: i + 1,
-            difficulty: mp?.difficulty ?? 'easy',
-          }
-        }),
-      }
-      MOCK_LAB_SESSIONS.push(lab)
-      return lab
-    })
+  data: {
+    title: string
+    topic: string
+    starts_at: string
+    ends_at: string
+    problem_ids: { problem_id: string; is_mandatory: boolean }[]
+  }
+): Promise<LabSessionDetail> => {
+  const mandatoryCount = data.problem_ids.filter((p) => p.is_mandatory).length || 1
+  const payload = {
+    title: data.title,
+    description: data.topic,
+    starts_at: data.starts_at,
+    ends_at: data.ends_at,
+    mandatory_count: mandatoryCount,
+    problem_ids: data.problem_ids.map((p) => p.problem_id),
+  }
+  return apiClient.post<any>(`/courses/${courseId}/labs`, payload).then((r) => {
+    const l = r.data
+    return {
+      id: l.id,
+      course_id: l.course_id,
+      title: l.title,
+      topic: l.description || data.topic,
+      starts_at: l.starts_at,
+      ends_at: l.ends_at,
+      is_active: l.is_active,
+      problem_count: data.problem_ids.length,
+      mandatory_count: mandatoryCount,
+      problems: (l.problems || []).map((p: any, idx: number) => ({
+        problem_id: p.id,
+        problem_slug: p.slug,
+        problem_title: p.title,
+        is_mandatory: idx < mandatoryCount,
+        order_index: p.order_index ?? idx + 1,
+        difficulty: p.difficulty ?? 'easy',
+      })),
+    }
+  })
+}
 
 export const getLabDashboard = (labId: string): Promise<StudentLabProgress[]> =>
-  apiClient.get<StudentLabProgress[]>(`/lab-sessions/${labId}/dashboard`).then((r) => r.data)
-    .catch(() => {
-      console.warn('[Mock] lab dashboard')
-      return [
-        { user_id: 's1', user_name: 'Alice Johnson', user_email: 'alice@example.com', mandatory_solved: 1, mandatory_total: 1, extra_solved: 2, badges_earned: 2, last_submission_at: new Date().toISOString() },
-        { user_id: 's2', user_name: 'Bob Smith', user_email: 'bob@example.com', mandatory_solved: 1, mandatory_total: 1, extra_solved: 1, badges_earned: 1, last_submission_at: new Date(Date.now() - 600000).toISOString() },
-        { user_id: 's3', user_name: 'Charlie Brown', user_email: 'charlie@example.com', mandatory_solved: 0, mandatory_total: 1, extra_solved: 0, badges_earned: 0, last_submission_at: null },
-        { user_id: 's4', user_name: 'Diana Prince', user_email: 'diana@example.com', mandatory_solved: 1, mandatory_total: 1, extra_solved: 2, badges_earned: 2, last_submission_at: new Date(Date.now() - 300000).toISOString() },
-        { user_id: 's5', user_name: 'Eve Adams', user_email: 'eve@example.com', mandatory_solved: 1, mandatory_total: 1, extra_solved: 0, badges_earned: 0, last_submission_at: new Date(Date.now() - 1200000).toISOString() },
-      ]
-    })
+  apiClient.get<any>(`/labs/${labId}/dashboard`).then((r) => {
+    const data = r.data
+    const students = data.students || []
+    return students.map((s: any) => ({
+      user_id: s.user_id,
+      user_name: s.name,
+      user_email: s.email,
+      mandatory_solved: s.mandatory_completed
+        ? data.mandatory_count
+        : Math.min(s.problems_solved, data.mandatory_count),
+      mandatory_total: data.mandatory_count,
+      extra_solved: Math.max(0, s.problems_solved - data.mandatory_count),
+      badges_earned: s.badge_count,
+      last_submission_at: s.last_submission_at,
+    }))
+  })
 
-export const getMyLabProgress = (labId: string): Promise<MyLabProgress> =>
-  apiClient.get<MyLabProgress>(`/lab-sessions/${labId}/my-progress`).then((r) => r.data)
-    .catch(() => {
-      const lab = MOCK_LAB_SESSIONS.find((l) => l.id === labId)
-      if (!lab) throw new Error('Lab not found')
-      return {
-        lab_session_id: lab.id,
-        mandatory_solved: 1,
-        mandatory_total: lab.mandatory_count,
-        extra_solved: 1,
-        badges_earned: 1,
-        problems: lab.problems.map((p) => ({
-          problem_id: p.problem_id,
-          problem_slug: p.problem_slug,
-          problem_title: p.problem_title,
-          is_mandatory: p.is_mandatory,
-          is_solved: p.order_index <= 2,
-          best_score: p.order_index <= 2 ? 100 : null,
-        })),
-      }
-    })
+export const getMyLabProgress = async (labId: string): Promise<MyLabProgress> => {
+  const [lab, progressRes] = await Promise.all([
+    getLabSession(labId),
+    apiClient.get<any>(`/labs/${labId}/my-progress`).then((r) => r.data),
+  ])
+  const solvedSet = new Set((progressRes.solved_problem_ids || []).map((id: string) => String(id)))
+  const mandTotal = progressRes.mandatory_count || lab.mandatory_count || 1
+  const solvedCount = progressRes.problems_solved_count || 0
+  return {
+    lab_session_id: labId,
+    mandatory_solved: progressRes.mandatory_completed
+      ? mandTotal
+      : Math.min(solvedCount, mandTotal),
+    mandatory_total: mandTotal,
+    extra_solved: Math.max(0, solvedCount - mandTotal),
+    badges_earned: progressRes.badge_count || 0,
+    problems: (lab.problems || []).map((p) => ({
+      problem_id: p.problem_id,
+      problem_slug: p.problem_slug,
+      problem_title: p.problem_title,
+      is_mandatory: p.is_mandatory,
+      is_solved: solvedSet.has(String(p.problem_id)),
+      best_score: solvedSet.has(String(p.problem_id)) ? 100 : null,
+    })),
+  }
+}
 
 // ── Gradebook API ─────────────────────────────────────────────────────────────
 
-export const getGradebook = (courseId: string): Promise<GradebookRow[]> =>
-  apiClient.get<GradebookRow[]>(`/courses/${courseId}/gradebook`).then((r) => r.data)
-    .catch(() => {
-      console.warn('[Mock] gradebook')
-      const labs = MOCK_LAB_SESSIONS.filter((l) => l.course_id === courseId)
-      const makeLR = (solved: number[], badges: number[]): LabGradeResult[] =>
-        labs.map((l, i) => ({ lab_session_id: l.id, lab_title: l.title, mandatory_solved: solved[i] ?? 0, mandatory_total: l.mandatory_count, badges_earned: badges[i] ?? 0 }))
-      return [
-        { user_id: 's1', user_name: 'Alice Johnson', user_email: 'alice@example.com', lab_results: makeLR([1, 1], [2, 1]), total_badges: 3, total_mandatory_solved: 2, total_mandatory: 2 },
-        { user_id: 's2', user_name: 'Bob Smith', user_email: 'bob@example.com', lab_results: makeLR([1, 0], [1, 0]), total_badges: 1, total_mandatory_solved: 1, total_mandatory: 2 },
-        { user_id: 's3', user_name: 'Charlie Brown', user_email: 'charlie@example.com', lab_results: makeLR([0, 0], [0, 0]), total_badges: 0, total_mandatory_solved: 0, total_mandatory: 2 },
-        { user_id: 's4', user_name: 'Diana Prince', user_email: 'diana@example.com', lab_results: makeLR([1, 1], [2, 1]), total_badges: 3, total_mandatory_solved: 2, total_mandatory: 2 },
-        { user_id: 's5', user_name: 'Eve Adams', user_email: 'eve@example.com', lab_results: makeLR([1, 1], [0, 0]), total_badges: 0, total_mandatory_solved: 2, total_mandatory: 2 },
-      ]
+export const getGradebook = async (courseId: string): Promise<GradebookRow[]> => {
+  // Fetch real gradebook and course labs in parallel
+  const [gbData, labs] = await Promise.all([
+    apiClient.get<any>(`/courses/${courseId}/gradebook`).then((r) => r.data),
+    getCourseLabs(courseId).catch(() => []),
+  ])
+
+  // Also fetch lab dashboard for the active labs if present to get accurate badge counts
+  const labDashboards: Record<string, StudentLabProgress[]> = {}
+  await Promise.all(
+    labs.map(async (l) => {
+      try {
+        labDashboards[l.id] = await getLabDashboard(l.id)
+      } catch {
+        labDashboards[l.id] = []
+      }
     })
+  )
+
+  const rows: any[] = gbData.rows || []
+  return rows.map((r) => {
+    let totalBadges = 0
+    let totalMandatorySolved = 0
+    let totalMandatory = 0
+
+    const labResults: LabGradeResult[] = labs.map((l) => {
+      const studentDash = (labDashboards[l.id] || []).find((s) => s.user_id === r.user_id)
+      const badges = studentDash?.badges_earned ?? 0
+      const mandSolved = studentDash?.mandatory_solved ?? 0
+      const mandTotal = l.mandatory_count || 1
+
+      totalBadges += badges
+      totalMandatorySolved += mandSolved
+      totalMandatory += mandTotal
+
+      return {
+        lab_session_id: l.id,
+        lab_title: l.title,
+        mandatory_solved: mandSolved,
+        mandatory_total: mandTotal,
+        badges_earned: badges,
+      }
+    })
+
+    // If no labs in course yet, build virtual entry from problems
+    if (labs.length === 0) {
+      const solvedProblems = Object.values(r.scores || {}).filter((sc) => sc === 100).length
+      totalMandatorySolved = solvedProblems
+      totalMandatory = (gbData.problems || []).length || 1
+    }
+
+    return {
+      user_id: r.user_id,
+      user_name: r.name,
+      user_email: r.email,
+      lab_results: labResults,
+      total_badges: totalBadges,
+      total_mandatory_solved: totalMandatorySolved,
+      total_mandatory: totalMandatory || 1,
+    }
+  })
+}
 
 
 

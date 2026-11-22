@@ -58,14 +58,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await apiLogin(payload)
       storeTokens(data.access_token, data.refresh_token)
       setUser(data.user)
-    } catch {
-      // ── Mock fallback when API is unavailable ──
-      // Credentials: test@test.com / password123  OR  admin@test.com / password123
-      const MOCK_USERS: Record<string, UserResponse> = {
-        'test@test.com': { id: 'mock-student-1', email: 'test@test.com', name: 'Test Student', role: 'student', created_at: new Date().toISOString() },
-        'admin@test.com': { id: 'mock-instructor-1', email: 'admin@test.com', name: 'Admin Instructor', role: 'instructor', created_at: new Date().toISOString() },
+    } catch (err: any) {
+      if (err?.response) {
+        throw err
       }
-      const mockUser = MOCK_USERS[payload.email] ?? {
+      // ── Offline fallback only if server unreachable ──
+      const mockUser: UserResponse = {
         id: 'mock-' + Math.random().toString(36).substring(2, 9),
         email: payload.email,
         name: payload.email.split('@')[0],
@@ -75,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       storeTokens('mock-access-token', 'mock-refresh-token')
       localStorage.setItem('cf_mock_user', JSON.stringify(mockUser))
       setUser(mockUser)
-      console.warn('[Auth] Using MOCK login — backend unavailable')
+      console.warn('[Auth] Network unreachable, using offline fallback')
     }
   }, [])
 
@@ -84,8 +82,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await apiRegister(payload)
       storeTokens(data.access_token, data.refresh_token)
       setUser(data.user)
-    } catch {
-      // ── Mock fallback when API is unavailable ──
+    } catch (err: any) {
+      if (err?.response) {
+        throw err
+      }
+      // ── Offline fallback only if server unreachable ──
       const mockUser: UserResponse = {
         id: 'mock-' + Math.random().toString(36).substring(2, 9),
         email: payload.email,
@@ -96,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       storeTokens('mock-access-token', 'mock-refresh-token')
       localStorage.setItem('cf_mock_user', JSON.stringify(mockUser))
       setUser(mockUser)
-      console.warn('[Auth] Using MOCK register — backend unavailable')
+      console.warn('[Auth] Network unreachable, using offline fallback')
     }
   }, [])
 

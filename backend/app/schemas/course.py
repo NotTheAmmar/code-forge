@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class CourseCreate(BaseModel):
@@ -24,6 +24,16 @@ class CourseResponse(BaseModel):
     problem_count: int = 0
     created_at: datetime
 
+    @computed_field
+    @property
+    def join_code(self) -> str:
+        return self.invite_code
+
+    @computed_field
+    @property
+    def instructor_id(self) -> str:
+        return str(self.created_by)
+
 
 class CourseDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -37,9 +47,24 @@ class CourseDetailResponse(BaseModel):
     member_count: int = 0
     created_at: datetime
 
+    @computed_field
+    @property
+    def join_code(self) -> str:
+        return self.invite_code
+
+    @computed_field
+    @property
+    def instructor_id(self) -> str:
+        return str(self.created_by)
+
 
 class CourseJoinRequest(BaseModel):
-    invite_code: str = Field(..., min_length=4, max_length=16)
+    invite_code: str | None = None
+    join_code: str | None = None
+
+    @property
+    def code(self) -> str:
+        return (self.invite_code or self.join_code or "").strip()
 
 
 class EnrollmentResponse(BaseModel):

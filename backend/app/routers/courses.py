@@ -305,6 +305,63 @@ async def get_course(
 
 
 @router.post(
+    "/courses/join",
+    response_model=CourseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Join a course using an invite code (direct code lookup)",
+)
+async def join_course_by_code(
+    body: CourseJoinRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CourseResponse:
+    """Find course by invite code and enroll current user as student if not already enrolled."""
+    code = body.code.upper()
+    if not code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invite code is required.",
+        )
+
+    res = await db.execute(select(Course).where(func.upper(Course.invite_code) == code))
+    course = res.scalar_one_or_none()
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course with this invite code not found.",
+        )
+
+    # Check if already enrolled
+    enr_res = await db.execute(
+        select(Enrollment).where(
+            Enrollment.course_id == course.id,
+            Enrollment.user_id == current_user.id,
+        )
+    )
+    enrollment = enr_res.scalar_one_or_none()
+    if enrollment is None:
+        enrollment = Enrollment(
+            id=uuid.uuid4(),
+            user_id=current_user.id,
+            course_id=course.id,
+            role="student",
+        )
+        db.add(enrollment)
+        await db.commit()
+        await db.refresh(enrollment)
+
+    # Counts
+    mem_cnt = await db.scalar(
+        select(func.count(Enrollment.id)).where(Enrollment.course_id == course.id)
+    ) or 0
+    prob_cnt = await db.scalar(
+        select(func.count(Problem.id)).where(Problem.course_id == course.id)
+    ) or 0
+
+    return _build_course_response(course, enrollment, mem_cnt, prob_cnt)
+
+
+@router.post(
     "/courses/{course_id}/join",
     response_model=EnrollmentResponse,
     status_code=status.HTTP_201_CREATED,
@@ -319,7 +376,8 @@ async def join_course(
     """Enroll the current user in the course if the invite code matches."""
     course = await _get_course_or_404(course_id, db)
 
-    if course.invite_code.upper() != body.invite_code.upper():
+    req_code = body.code.upper()
+    if course.invite_code.upper() != req_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid invite code.",
