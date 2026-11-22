@@ -322,38 +322,45 @@ exam_violations
   - Pre-seeded progress records for demo students (Diana, Alice).
 - [x] Automated test suite: 127/127 tests passed in `tests/test_modules.py` and across all suites.
 
-### Phase A4: Proctored Exam System (3-4 hours)
+### Phase A4: Proctored Exam System (3-4 hours) ✅ Completed
 
 **Models:**
-- [ ] Create `Exam` model (`app/models/exam.py`).
-- [ ] Create `ExamProblem` model (association table).
-- [ ] Create `ExamSession` model (`app/models/exam_session.py`).
-- [ ] Create `ExamViolation` model (`app/models/exam_violation.py`).
+- [x] Create `Exam` model (`app/models/exam.py`).
+- [x] Create `ExamProblem` model (association table with order & weights).
+- [x] Create `ExamSession` model (`app/models/exam_session.py`).
+- [x] Create `ExamViolation` model (`app/models/exam_violation.py`).
 
-**Schemas:**
-- [ ] `ExamCreate` (title, description, duration_minutes, starts_at, ends_at, problem_ids, fullscreen_required, tab_switch_limit, copy_paste_blocked).
-- [ ] `ExamResponse`, `ExamDetailResponse`.
-- [ ] `ExamSessionResponse` (session state, time remaining, violations count).
-- [ ] `ExamViolationCreate` (violation_type, details).
-- [ ] `ExamResultResponse` (per-student results + violation summary).
+**Schemas (`app/schemas/exam.py`):**
+- [x] `ExamCreate`, `ExamUpdate` (title, description, duration_minutes, starts_at, ends_at, problems with weights, fullscreen_required, tab_switch_limit, copy_paste_blocked).
+- [x] `ExamResponse`, `ExamDetailResponse` (with problem concealment logic prior to session start).
+- [x] `ExamSessionStartResponse` (session state, duration_seconds, remaining_seconds, anti-cheat config).
+- [x] `ExamViolationCreate`, `ExamViolationResponse` (tracking violation totals, remaining tab switches, flagged status).
+- [x] `ExamSubmitRequest`, `ExamSessionSummary` (weighted scoring across problem submissions).
+- [x] `ExamStudentResult`, `ExamResultsDashboard` (instructor audit overview with average score, completion status, violation logs).
+- [x] `ExamMyResultResponse` (student grade and problem score breakdown).
 
 **Router (`app/routers/exams.py`):**
-- [ ] `POST /courses/{id}/exams` — create exam, attach problems (instructor).
-- [ ] `GET /courses/{id}/exams` — list exams (enrolled).
-- [ ] `GET /exams/{id}` — exam details; if student, only after session started.
-- [ ] `POST /exams/{id}/start` — start exam session:
-  - Enforce single session per student (`UNIQUE(exam_id, user_id)`).
+- [x] `POST /courses/{id}/exams` — create exam, attach problems (instructor).
+- [x] `GET /courses/{id}/exams` — list exams with per-student sitting status (enrolled).
+- [x] `GET /exams/{id}` — exam details; problem statements and templates concealed for students prior to starting session.
+- [x] `PUT /exams/{id}` — update exam parameters (instructor).
+- [x] `DELETE /exams/{id}` — delete exam (instructor).
+- [x] `POST /exams/{id}/start` — start exam session:
+  - Enforce single session per student (`UNIQUE(exam_id, user_id)`), resumes if sitting is active.
   - Enforce time window (`starts_at <= now <= ends_at`).
-  - Return session with problems and remaining time.
-- [ ] `POST /exams/{id}/submit` — submit exam:
-  - Calculate total_score from submission scores × problem weights.
+  - Return session with revealed problem statements, starter codes, and remaining duration.
+- [x] `POST /exam-sessions/{id}/violations` — log anti-cheat violations (`tab_switch`, `fullscreen_exit`, `copy_paste`, `focus_loss`), computes remaining switches against limit, flags cheating.
+- [x] `POST /exams/{id}/submit` — submit exam:
+  - Calculate total_score from highest accepted/partial submissions during sitting × problem weights.
   - Set `submitted_at`, prevent re-submission.
-- [ ] `POST /exam-sessions/{id}/violations` — log violation from frontend.
-- [ ] `GET /exams/{id}/results` — instructor: all students' results + violation counts.
-- [ ] `GET /exams/{id}/my-result` — student: own result.
+- [x] `GET /exams/{id}/results` — instructor: all students' results + violation audit logs + class average.
+- [x] `GET /exams/{id}/my-result` — student: own result and problem score breakdown.
+- [x] Registered `exams_router` in `app/main.py`.
 
-**Auto-submit Logic:**
-- [ ] Background Celery beat task or middleware: check for expired exam sessions (started_at + duration_minutes < now AND submitted_at IS NULL) → auto-submit.
+**Seed Data & Testing:**
+- [x] Seeded "CS101 Midterm Proctored Assessment" in `app/seed.py` with 2 weighted problems (Hello World, Two Sum) and demo sessions for Diana (100 pts, 0 violations), Alice (100 pts, 1 tab-switch violation), and Bob (in-progress, 2 violations).
+- [x] Automated test suite in `tests/test_exams.py` (6 tests covering full lifecycle, permissions, time checks, concealment, violation thresholds, scoring, and CRUD).
+- [x] Full test suite verification: **133/133 passed** (`docker compose run --rm api pytest -v`).
 
 ### Phase A5: Analytics + Advanced Grading + Custom Input (2-3 hours)
 

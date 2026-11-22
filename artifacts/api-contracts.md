@@ -7,8 +7,8 @@
 All endpoints return JSON responses. Errors use standard HTTP status codes with an `{ "detail": "message" }` payload.
 
 > **Implementation status key:**
-> - ✅ Implemented & tested (Auth, Courses, Problems, Labs, Submissions, Badges, WebSocket Streaming, Learning Modules)
-> - 📋 Phase 0 Agreed Contracts (Proctored Exams, Analytics, Custom Input)
+> - ✅ Implemented & tested (Auth, Courses, Problems, Labs, Submissions, Badges, WebSocket Streaming, Learning Modules, Proctored Exams)
+> - 📋 Phase 0 Agreed Contracts (Analytics, Custom Input)
 
 ---
 
@@ -890,7 +890,7 @@ All endpoints return JSON responses. Errors use standard HTTP status codes with 
 
 ---
 
-## 9. Proctored Assessment & Anti-Cheat Endpoints 📋
+## 9. Proctored Assessment & Anti-Cheat Endpoints ✅
 
 ### 9.1 Create Proctored Exam
 - **Endpoint:** `POST /api/v1/courses/{course_id}/exams`

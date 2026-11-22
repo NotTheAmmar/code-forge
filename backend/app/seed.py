@@ -37,6 +37,9 @@ from app.db import AsyncSessionLocal, engine
 from app.models.badge import Badge
 from app.models.course import Course
 from app.models.enrollment import Enrollment
+from app.models.exam import Exam, ExamProblem
+from app.models.exam_session import ExamSession
+from app.models.exam_violation import ExamViolation
 from app.models.lab_session import LabSession, LabSessionProblem
 from app.models.learning_content import LearningContent
 from app.models.learning_module import LearningModule
@@ -636,6 +639,129 @@ async def seed() -> None:
                         )
                     )
 
+        # ── 8. Proctored Midterm Exam ─────────────────────────────────────────
+        exam_title = "CS101 Midterm Proctored Assessment"
+        exam_chk = await session.execute(
+            select(Exam).where(
+                Exam.course_id == course.id,
+                Exam.title == exam_title,
+            )
+        )
+        exam = exam_chk.scalar_one_or_none()
+        if exam is None:
+            exam = Exam(
+                id=uuid.uuid4(),
+                course_id=course.id,
+                title=exam_title,
+                description="Comprehensive proctored assessment covering programming fundamentals and problem solving.",
+                duration_minutes=60,
+                starts_at=now - timedelta(hours=2),
+                ends_at=now + timedelta(days=2),
+                is_active=True,
+                fullscreen_required=True,
+                tab_switch_limit=3,
+                copy_paste_blocked=True,
+                created_by=instructor.id,
+            )
+            session.add(exam)
+            await session.flush()
+            logger.info("Created proctored exam: %s", exam.title)
+
+            # Link hello-world and two-sum
+            if "hello-world" in problem_map:
+                session.add(
+                    ExamProblem(
+                        id=uuid.uuid4(),
+                        exam_id=exam.id,
+                        problem_id=problem_map["hello-world"].id,
+                        order_index=0,
+                        weight=50,
+                    )
+                )
+            if "two-sum" in problem_map:
+                session.add(
+                    ExamProblem(
+                        id=uuid.uuid4(),
+                        exam_id=exam.id,
+                        problem_id=problem_map["two-sum"].id,
+                        order_index=1,
+                        weight=50,
+                    )
+                )
+            await session.flush()
+
+            # Pre-seed session for Diana (completed, 100 points, 0 violations)
+            diana_user = student_users.get("diana@codeforge.local")
+            if diana_user:
+                diana_sess = ExamSession(
+                    id=uuid.uuid4(),
+                    exam_id=exam.id,
+                    user_id=diana_user.id,
+                    started_at=now - timedelta(minutes=90),
+                    submitted_at=now - timedelta(minutes=40),
+                    is_auto_submitted=False,
+                    total_score=100,
+                )
+                session.add(diana_sess)
+
+            # Pre-seed session for Alice (completed, 100 points, 1 violation)
+            alice_user = student_users.get("alice@codeforge.local")
+            if alice_user:
+                alice_sess = ExamSession(
+                    id=uuid.uuid4(),
+                    exam_id=exam.id,
+                    user_id=alice_user.id,
+                    started_at=now - timedelta(minutes=75),
+                    submitted_at=now - timedelta(minutes=30),
+                    is_auto_submitted=False,
+                    total_score=100,
+                )
+                session.add(alice_sess)
+                await session.flush()
+
+                v1 = ExamViolation(
+                    id=uuid.uuid4(),
+                    exam_session_id=alice_sess.id,
+                    violation_type="tab_switch",
+                    details="Switched tab away for 4 seconds",
+                    occurred_at=now - timedelta(minutes=60),
+                )
+                session.add(v1)
+
+            # Pre-seed session for Bob (in_progress, 2 violations)
+            bob_user = student_users.get("bob@codeforge.local")
+            if bob_user:
+                bob_sess = ExamSession(
+                    id=uuid.uuid4(),
+                    exam_id=exam.id,
+                    user_id=bob_user.id,
+                    started_at=now - timedelta(minutes=20),
+                    submitted_at=None,
+                    is_auto_submitted=False,
+                    total_score=None,
+                )
+                session.add(bob_sess)
+                await session.flush()
+
+                session.add(
+                    ExamViolation(
+                        id=uuid.uuid4(),
+                        exam_session_id=bob_sess.id,
+                        violation_type="tab_switch",
+                        details="Switched to external reference tab",
+                        occurred_at=now - timedelta(minutes=15),
+                    )
+                )
+                session.add(
+                    ExamViolation(
+                        id=uuid.uuid4(),
+                        exam_session_id=bob_sess.id,
+                        violation_type="fullscreen_exit",
+                        details="Exited fullscreen mode",
+                        occurred_at=now - timedelta(minutes=10),
+                    )
+                )
+
         await session.commit()
 
     logger.info("Seeding completed successfully!")
@@ -645,6 +771,7 @@ async def seed() -> None:
     logger.info("  Other Students:     diana@, alice@, bob@, charlie@ (password: changeme)")
     logger.info("  Default Course:     CS101 (Invite Code: CS101A)")
     logger.info("  Lab Session:        %s", lab_title)
+    logger.info("  Proctored Exam:     %s", exam_title)
     logger.info("  Pre-seeded Badges:  Diana (3 ⭐), Alice (2 ⭐), Bob (1 ⭐)")
     logger.info("==================================================")
 

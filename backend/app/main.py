@@ -5,6 +5,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.config import settings
 from app.routers.auth import router as auth_router
 from app.routers.courses import router as courses_router
+from app.routers.exams import router as exams_router
 from app.routers.labs import router as labs_router
 from app.routers.modules import router as modules_router
 from app.routers.problems import router as problems_router
@@ -34,6 +35,7 @@ API_PREFIX = "/api/v1"
 
 app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(courses_router, prefix=API_PREFIX)
+app.include_router(exams_router, prefix=API_PREFIX)
 app.include_router(labs_router, prefix=API_PREFIX)
 app.include_router(modules_router, prefix=API_PREFIX)
 app.include_router(problems_router, prefix=API_PREFIX)
