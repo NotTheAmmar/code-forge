@@ -12,15 +12,16 @@ class RunRequest(BaseModel):
     """Payload for POST /problems/{id}/run (runs visible cases only)."""
 
     source_code: str
-    language: str = "java"  # java | python
+    language: str = "java"  # java | python | c | cpp
 
 
 class SubmitRequest(BaseModel):
-    """Payload for POST /problems/{id}/submit (full grading + lab tagging)."""
+    """Payload for POST /problems/{id}/submit (full grading + lab/exam tagging)."""
 
     source_code: str
-    language: str = "java"  # java | python
+    language: str = "java"  # java | python | c | cpp
     lab_session_id: uuid.UUID | None = None
+    exam_session_id: uuid.UUID | None = None
 
 
 # ── Responses ─────────────────────────────────────────────────────────────────

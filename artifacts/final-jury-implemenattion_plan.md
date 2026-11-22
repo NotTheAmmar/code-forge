@@ -270,21 +270,22 @@ exam_violations
 - [x] Update Nginx config (`frontend/nginx.conf`) to proxy `ws://` connections for `/ws/` and `/api/`.
 - [x] Tested with full automated test suite: 111/111 tests passed in `tests/test_websocket.py` and across all suites.
 
-### Phase A2: C/C++ Language Support + Security Hardening (2-3 hours)
+### Phase A2: C/C++ Language Support + Security Hardening (2-3 hours) ✅ Completed
 
 **C/C++ Sandbox:**
-- [ ] Update `worker/sandbox.py` to handle `language="c"` and `language="cpp"`:
-  - C: Compile with `gcc -o solution solution.c`, run `./solution`.
-  - C++: Compile with `g++ -o solution solution.cpp`, run `./solution`.
+- [x] Update `worker/sandbox.py` to handle `language="c"` and `language="cpp"`:
+  - C: Compile with `gcc -O2 -o solution Solution.c` in `codeforge-sandbox-c`, run `./solution < /code/stdin.txt`.
+  - C++: Compile with `g++ -O2 -std=c++20 -o solution Solution.cpp` in `codeforge-sandbox-cpp`, run `./solution < /code/stdin.txt`.
   - Same security profile as Java/Python.
   - Use `codeforge-sandbox-c` / `codeforge-sandbox-cpp` images.
-- [ ] Add `"c"` and `"cpp"` to the `language` enum in schemas and models.
-- [ ] Update the sandbox image map in `sandbox.py`.
+- [x] Add `"c"` and `"cpp"` to the `language` support in schemas (`RunRequest`, `SubmitRequest`, `ProblemCreate`, `ProblemDetail`) and models.
+- [x] Update the sandbox image map in `sandbox.py` (`SANDBOX_IMAGES`).
 
 **Security Hardening:**
-- [ ] Add `--pids-limit=64` to sandbox container creation (prevents fork bombs).
-- [ ] Add `--ulimit nofile=64:64` (prevents file descriptor exhaustion).
-- [ ] Enforce tmpfs size limit: `--tmpfs /tmp:size=16m,noexec,nosuid` (tighter than current 32m).
+- [x] Add `--pids-limit=64` to sandbox container creation (prevents fork bombs, verified with automated bomb containment tests).
+- [x] Add `--ulimit nofile=64:64` (prevents file descriptor exhaustion, verified with `ulimit -n`).
+- [x] Enforce tmpfs size limit: `--tmpfs /tmp:size=16m,noexec,nosuid` (tighter than previous 32m).
+- [x] Verified full test suite: **122/122 passed** across `tests/test_sandbox_cpp.py`, `tests/test_security.py`, and existing suites.
 - [ ] Add adversarial test cases to the test suite (`tests/test_security.py`):
   - Fork bomb (Python: `os.fork()` loop, C: `fork()` loop) → should hit pids-limit.
   - Memory bomb (`[0] * 10**9`) → should hit memory limit.

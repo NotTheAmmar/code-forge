@@ -22,8 +22,9 @@ class Settings(BaseSettings):
     sandbox_memory_limit: str = "128m"
     sandbox_cpu_limit: float = 0.5
     sandbox_default_timeout: int = 10
-    sandbox_tmpfs_size: str = "32m"
+    sandbox_tmpfs_size: str = "16m"
     sandbox_pids_limit: int = 64
+    sandbox_ulimit_nofile: int = 64
 
     # Docker
     docker_host: str = "unix:///var/run/docker.sock"

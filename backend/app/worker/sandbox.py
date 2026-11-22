@@ -35,6 +35,7 @@ from docker.errors import ContainerError, DockerException, NotFound
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.test_case import TestCase
@@ -45,9 +46,20 @@ logger = logging.getLogger(__name__)
 # Build them with:
 #   docker build -t codeforge-sandbox-java ./sandbox/java
 #   docker build -t codeforge-sandbox-python ./sandbox/python
+#   docker build -t codeforge-sandbox-c ./sandbox/c
+#   docker build -t codeforge-sandbox-cpp ./sandbox/cpp
 SANDBOX_JAVA_IMAGE = "codeforge-sandbox-java"
 SANDBOX_PYTHON_IMAGE = "codeforge-sandbox-python"
+SANDBOX_C_IMAGE = "codeforge-sandbox-c"
+SANDBOX_CPP_IMAGE = "codeforge-sandbox-cpp"
 SANDBOX_IMAGE = SANDBOX_JAVA_IMAGE  # Backward compatibility alias
+
+SANDBOX_IMAGES = {
+    "java": SANDBOX_JAVA_IMAGE,
+    "python": SANDBOX_PYTHON_IMAGE,
+    "c": SANDBOX_C_IMAGE,
+    "cpp": SANDBOX_CPP_IMAGE,
+}
 SANDBOX_WORKDIR = "/code"
 
 
@@ -151,7 +163,7 @@ def _compile_and_run(
     tmp_dir: str,
     session: Session,
 ) -> dict:
-    """Write source, compile (if Java), then run each test case."""
+    """Write source, compile (if Java, C, or C++), then run each test case."""
     lang = (submission.language or "java").strip().lower()
 
     from app.websocket.submissions_ws import publish_submission_event
@@ -161,8 +173,15 @@ def _compile_and_run(
         with open(source_path, "w", encoding="utf-8") as f:
             f.write(submission.source_code)
     else:
-        # Default Java
-        source_path = os.path.join(tmp_dir, "Solution.java")
+        # Compiled languages: java, c, cpp
+        if lang == "c":
+            filename = "Solution.c"
+        elif lang == "cpp":
+            filename = "Solution.cpp"
+        else:
+            filename = "Solution.java"
+
+        source_path = os.path.join(tmp_dir, filename)
         with open(source_path, "w", encoding="utf-8") as f:
             f.write(submission.source_code)
 
@@ -171,10 +190,10 @@ def _compile_and_run(
             "event": "status",
             "submission_id": str(submission.id),
             "status": "compiling",
-            "message": "Compiling source code in sandbox container",
+            "message": f"Compiling {lang.upper()} source code in sandbox container",
         })
 
-        compile_result = _compile_java(docker_client, tmp_dir, problem)
+        compile_result = _compile_code(docker_client, tmp_dir, problem, language=lang)
 
         if not compile_result["success"]:
             # Update submission: compile_error
@@ -182,7 +201,6 @@ def _compile_and_run(
             submission.score = 0
             submission.total_cases = len(test_cases)
             submission.passed_cases = 0
-            submission.results_json = []
             submission.execution_time_ms = 0
             # Store compile error in results_json so the frontend can display it
             submission.results_json = [{
@@ -196,9 +214,7 @@ def _compile_and_run(
                 "error": compile_result["error"],
             }]
             session.commit()
-            logger.info(
-                "Submission %s: compile error", submission.id
-            )
+            logger.info("Submission %s: %s compile error", submission.id, lang)
             publish_submission_event(str(submission.id), {
                 "event": "completed",
                 "submission_id": str(submission.id),
@@ -301,22 +317,46 @@ def _compile_and_run(
 
 # ── Compilation ───────────────────────────────────────────────────────────────
 
-def _compile_java(docker_client, tmp_dir: str, problem: Problem) -> dict:
-    """Compile Solution.java inside a sandbox container.
+def _compile_code(
+    docker_client,
+    tmp_dir: str,
+    problem: Problem,
+    language: str = "java",
+) -> dict:
+    """Compile source code (Java, C, or C++) inside a hardened sandbox container.
 
     Uses put_archive to copy source code into the container rather than
     bind-mounting the temp directory. This works correctly when the Celery
     worker itself runs inside a Docker container (DinD scenario).
 
     Returns:
-        {"success": True} or {"success": False, "error": "<javac stderr>"}
+        {"success": True} or {"success": False, "error": "<compiler stderr>"}
     """
+    lang = (language or "java").strip().lower()
     container = None
+
+    if lang == "c":
+        sandbox_img = SANDBOX_C_IMAGE
+        source_name = "Solution.c"
+        compile_cmd = "gcc -O2 -o solution Solution.c"
+        is_binary = True
+    elif lang == "cpp":
+        sandbox_img = SANDBOX_CPP_IMAGE
+        source_name = "Solution.cpp"
+        compile_cmd = "g++ -O2 -std=c++20 -o solution Solution.cpp"
+        is_binary = True
+    else:
+        # Default java
+        sandbox_img = SANDBOX_JAVA_IMAGE
+        source_name = "Solution.java"
+        compile_cmd = "javac Solution.java"
+        is_binary = False
+
     try:
-        # Create the container (don't start yet)
+        # Create container with strict resource and process limits
         container = docker_client.containers.create(
-            image=SANDBOX_IMAGE,
-            command="javac Solution.java",
+            image=sandbox_img,
+            command=compile_cmd,
             working_dir=SANDBOX_WORKDIR,
             network_disabled=True,
             mem_limit=f"{problem.memory_limit_mb}m",
@@ -325,42 +365,68 @@ def _compile_java(docker_client, tmp_dir: str, problem: Problem) -> dict:
             cap_drop=["ALL"],
             security_opt=["no-new-privileges"],
             user="runner",
+            pids_limit=settings.sandbox_pids_limit,
+            ulimits=[
+                docker.types.Ulimit(
+                    name="nofile",
+                    soft=settings.sandbox_ulimit_nofile,
+                    hard=settings.sandbox_ulimit_nofile,
+                )
+            ],
+            tmpfs={"/tmp": f"size={settings.sandbox_tmpfs_size},noexec,nosuid"},
         )
 
-        # Copy Solution.java into the container via tar archive
-        source_path = os.path.join(tmp_dir, "Solution.java")
+        # Copy source into the container via tar archive
+        source_path = os.path.join(tmp_dir, source_name)
         tar_buffer = BytesIO()
         with tarfile.open(fileobj=tar_buffer, mode="w") as tar:
-            tar.add(source_path, arcname="Solution.java")
+            tar.add(source_path, arcname=source_name)
         tar_buffer.seek(0)
         container.put_archive(SANDBOX_WORKDIR, tar_buffer.getvalue())
 
-        # Start and wait for javac to finish
+        # Start and wait for compiler
         container.start()
         exit_result = container.wait(timeout=60)
         exit_code = exit_result.get("StatusCode", -1)
 
         if exit_code == 0:
-            # Compilation succeeded — copy the .class files back to tmp_dir
-            # so the execution step can use them
-            try:
-                bits, _ = container.get_archive(SANDBOX_WORKDIR)
-                class_tar = BytesIO(b"".join(bits))
-                with tarfile.open(fileobj=class_tar, mode="r") as tar:
-                    for member in tar.getmembers():
-                        if member.name.endswith(".class"):
+            if is_binary:
+                try:
+                    bits, _ = container.get_archive(f"{SANDBOX_WORKDIR}/solution")
+                    sol_tar = BytesIO(b"".join(bits))
+                    with tarfile.open(fileobj=sol_tar, mode="r") as tar:
+                        for member in tar.getmembers():
                             member.name = os.path.basename(member.name)
-                            tar.extract(member, path=tmp_dir)
-            except Exception as e:
-                logger.warning("Failed to retrieve .class files: %s", e)
+                            tar.extract(member, path=tmp_dir, filter="tar")
+                            os.chmod(os.path.join(tmp_dir, member.name), 0o755)
+                except Exception as e:
+                    logger.warning("Failed to retrieve compiled binary: %s", e)
+            else:
+                # Java: copy .class files back to tmp_dir
+                try:
+                    bits, _ = container.get_archive(SANDBOX_WORKDIR)
+                    class_tar = BytesIO(b"".join(bits))
+                    with tarfile.open(fileobj=class_tar, mode="r") as tar:
+                        for member in tar.getmembers():
+                            if member.name.endswith(".class"):
+                                member.name = os.path.basename(member.name)
+                                tar.extract(member, path=tmp_dir, filter="tar")
+                except Exception as e:
+                    logger.warning("Failed to retrieve .class files: %s", e)
 
             return {"success": True}
         else:
-            # Compilation failed — capture stderr
             stderr_logs = container.logs(stdout=False, stderr=True)
             if isinstance(stderr_logs, bytes):
                 stderr_logs = stderr_logs.decode("utf-8", errors="replace")
-            return {"success": False, "error": stderr_logs or f"javac exited with code {exit_code}"}
+            if not stderr_logs.strip():
+                stdout_logs = container.logs(stdout=True, stderr=False)
+                if isinstance(stdout_logs, bytes):
+                    stderr_logs = stdout_logs.decode("utf-8", errors="replace")
+            return {
+                "success": False,
+                "error": stderr_logs.strip() or f"Compilation exited with code {exit_code}",
+            }
 
     except DockerException as e:
         logger.exception("Docker error during compilation")
@@ -373,6 +439,10 @@ def _compile_java(docker_client, tmp_dir: str, problem: Problem) -> dict:
             except Exception:
                 pass
 
+
+def _compile_java(docker_client, tmp_dir: str, problem: Problem) -> dict:
+    """Backward-compatible wrapper for existing tests."""
+    return _compile_code(docker_client, tmp_dir, problem, language="java")
 
 
 # ── Test case execution ───────────────────────────────────────────────────────
@@ -389,24 +459,33 @@ def _run_test_case(
 
     Strategy:
     - Write stdin to a file (stdin.txt) in tmp_dir.
-    - Copy code/class files + stdin.txt into the container via put_archive.
+    - Copy code/class/binary files + stdin.txt into container via put_archive.
     - Run:
         Java:   sh -c 'java -cp /code Solution < /code/stdin.txt'
         Python: sh -c 'python3 Solution.py < /code/stdin.txt'
+        C:      sh -c 'chmod +x ./solution 2>/dev/null; ./solution < /code/stdin.txt'
+        C++:    sh -c 'chmod +x ./solution 2>/dev/null; ./solution < /code/stdin.txt'
     - Capture logs after completion.
 
     Returns a dict matching the TestCaseResult schema.
     """
     container = None
     start_time = time.monotonic()
-    is_python = (language or "java").strip().lower() == "python"
-    sandbox_img = SANDBOX_PYTHON_IMAGE if is_python else SANDBOX_JAVA_IMAGE
-    exec_cmd = (
-        ["sh", "-c", "python3 Solution.py < /code/stdin.txt"]
-        if is_python
-        else ["sh", "-c", "java -cp /code Solution < /code/stdin.txt"]
-    )
-    copy_exts = (".py", ".txt") if is_python else (".class", ".txt")
+    lang = (language or "java").strip().lower()
+
+    if lang == "python":
+        sandbox_img = SANDBOX_PYTHON_IMAGE
+        exec_cmd = ["sh", "-c", "python3 Solution.py < /code/stdin.txt"]
+        copy_exts = (".py", ".txt")
+    elif lang in ("c", "cpp"):
+        sandbox_img = SANDBOX_C_IMAGE if lang == "c" else SANDBOX_CPP_IMAGE
+        exec_cmd = ["sh", "-c", "chmod +x ./solution 2>/dev/null; ./solution < /code/stdin.txt"]
+        copy_exts = ("solution", ".txt")
+    else:
+        # Default java
+        sandbox_img = SANDBOX_JAVA_IMAGE
+        exec_cmd = ["sh", "-c", "java -cp /code Solution < /code/stdin.txt"]
+        copy_exts = (".class", ".txt")
 
     try:
         # Write stdin to a temp file so we can copy it into the container
@@ -414,10 +493,9 @@ def _run_test_case(
         with open(stdin_path, "w", encoding="utf-8") as f:
             f.write(test_case.input_data)
 
-        # Create container
+        # Create container with hardened security profiles
         container = docker_client.containers.create(
             image=sandbox_img,
-            # Use sh to redirect stdin from file — avoids socket complexity
             command=exec_cmd,
             working_dir=SANDBOX_WORKDIR,
             network_disabled=True,
@@ -427,13 +505,18 @@ def _run_test_case(
             cap_drop=["ALL"],
             security_opt=["no-new-privileges"],
             user="runner",
-            # Note: read_only=True removed — put_archive needs a writable /code.
-            # Security is maintained via: network_disabled, cap_drop=ALL,
-            # no-new-privileges, and running as non-root 'runner' user.
-            tmpfs={"/tmp": "size=32m,noexec,nosuid"},
+            pids_limit=settings.sandbox_pids_limit,
+            ulimits=[
+                docker.types.Ulimit(
+                    name="nofile",
+                    soft=settings.sandbox_ulimit_nofile,
+                    hard=settings.sandbox_ulimit_nofile,
+                )
+            ],
+            tmpfs={"/tmp": f"size={settings.sandbox_tmpfs_size},noexec,nosuid"},
         )
 
-        # Copy compiled .class / .py files + stdin.txt into the container
+        # Copy compiled .class / .py / solution files + stdin.txt into the container
         _copy_files_to_container(container, tmp_dir, extensions=copy_exts)
 
         # Start
@@ -552,8 +635,11 @@ def _copy_files_to_container(
     tmp_dir: str,
     extensions: tuple = (".class",),
 ) -> None:
-    """Copy files with the given extensions from tmp_dir into the container at /code."""
-    files = [f for f in os.listdir(tmp_dir) if f.endswith(extensions)]
+    """Copy files matching extensions or exact filenames from tmp_dir into container at /code."""
+    files = [
+        f for f in os.listdir(tmp_dir)
+        if any(f.endswith(ext) or f == ext for ext in extensions)
+    ]
     if not files:
         return
 

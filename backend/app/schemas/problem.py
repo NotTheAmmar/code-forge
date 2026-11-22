@@ -33,6 +33,8 @@ class ProblemCreate(BaseModel):
     difficulty: Literal["easy", "medium", "hard"] = "easy"
     starter_code_java: str = ""
     starter_code_python: str | None = None
+    starter_code_c: str | None = None
+    starter_code_cpp: str | None = None
     time_limit_sec: int = Field(default=10, ge=1, le=60)
     memory_limit_mb: int = Field(default=128, ge=16, le=1024)
     test_cases: list[TestCaseCreate] = Field(default_factory=list)
@@ -44,6 +46,8 @@ class ProblemUpdate(BaseModel):
     difficulty: Literal["easy", "medium", "hard"] | None = None
     starter_code_java: str | None = None
     starter_code_python: str | None = None
+    starter_code_c: str | None = None
+    starter_code_cpp: str | None = None
     time_limit_sec: int | None = None
     memory_limit_mb: int | None = None
     test_cases: list[TestCaseCreate] | None = None
@@ -68,6 +72,8 @@ class ProblemDetail(ProblemSummary):
     description: str
     starter_code_java: str
     starter_code_python: str | None = None
+    starter_code_c: str | None = None
+    starter_code_cpp: str | None = None
     test_cases: list[TestCaseSummary] = Field(default_factory=list)
 
 
