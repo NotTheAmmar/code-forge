@@ -194,7 +194,8 @@ async def ask_ai_tutor(
             f"Student Question / Request:\n{body.message}"
         )
 
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        model_name = settings.gemini_model.strip() or "gemini-2.5-flash"
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         gemini_payload = {
             "system_instruction": {
                 "parts": [{"text": SYSTEM_PROMPT}]
@@ -222,7 +223,7 @@ async def ask_ai_tutor(
                         if text:
                             return AITutorResponse(
                                 reply=text.strip(),
-                                model="gemini-1.5-flash",
+                                model=model_name,
                                 is_live=True,
                             )
                 else:
