@@ -22,6 +22,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://codeforge:password@db:5432/codeforge}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - PYTHONPATH=/app
     volumes:
       - ./backend:/app
@@ -53,6 +54,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://codeforge:password@db:5432/codeforge}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - DOCKER_HOST=${DOCKER_HOST:-unix:///var/run/docker.sock}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - PYTHONPATH=/app
     volumes:
       - ./backend:/app

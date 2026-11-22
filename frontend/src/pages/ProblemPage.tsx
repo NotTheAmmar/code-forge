@@ -17,6 +17,7 @@ import {
   RunCustomResponse,
 } from '../api/client'
 import ProblemDescription from '../components/ProblemDescription'
+import AITutorPanel from '../components/AITutorPanel'
 import CodeEditor, { KeybindingMode } from '../components/CodeEditor'
 import TestCasePanel from '../components/TestCasePanel'
 import Navbar from '../components/Navbar'
@@ -129,6 +130,7 @@ export default function ProblemPage() {
   const [pageLoading, setPageLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [rightTab, setRightTab] = useState<RightTab>('editor')
+  const [leftTab, setLeftTab] = useState<'description' | 'ai-tutor'>('description')
   const [badgeToast, setBadgeToast] = useState<{ count: number } | null>(null)
   const [labSession, setLabSession] = useState<LabSessionDetail | null>(null)
   const [labTimeLeft, setLabTimeLeft] = useState<string>('')
@@ -362,13 +364,49 @@ export default function ProblemPage() {
           </div>
         ) : (
           <PanelGroup direction="horizontal">
-            {/* Left Pane - Description */}
-            <Panel defaultSize={42} minSize={25} className="bg-white dark:bg-zinc-950">
-              <ProblemDescription
-                title={problem.title}
-                difficulty={problem.difficulty}
-                description={problem.description}
-              />
+            {/* Left Pane - Description or AI Tutor */}
+            <Panel defaultSize={42} minSize={25} className="flex flex-col bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800">
+              <div className="h-10 bg-zinc-50 dark:bg-zinc-900/40 border-b border-zinc-200 dark:border-zinc-900 flex items-center justify-between px-4 shrink-0">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setLeftTab('description')}
+                    className={`px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider transition-all ${
+                      leftTab === 'description'
+                        ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm border border-zinc-200 dark:border-zinc-700'
+                        : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    }`}
+                  >
+                    📖 Problem
+                  </button>
+                  <button
+                    onClick={() => setLeftTab('ai-tutor')}
+                    className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider transition-all ${
+                      leftTab === 'ai-tutor'
+                        ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 shadow-sm'
+                        : 'text-zinc-500 hover:text-orange-600 dark:hover:text-orange-400'
+                    }`}
+                  >
+                    <span>✨ AI Tutor</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-hidden">
+                {leftTab === 'description' ? (
+                  <ProblemDescription
+                    title={problem.title}
+                    difficulty={problem.difficulty}
+                    description={problem.description}
+                  />
+                ) : (
+                  <AITutorPanel
+                    problemSlug={problem.slug}
+                    problemTitle={problem.title}
+                    currentCode={code}
+                    currentLanguage={language}
+                  />
+                )}
+              </div>
             </Panel>
 
             {/* Resize handle vertical */}
@@ -471,6 +509,13 @@ export default function ProblemPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setLeftTab('ai-tutor')}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 border border-orange-500/20 hover:border-orange-500/50 bg-orange-500/5 hover:bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded text-xs font-semibold tracking-wider uppercase transition-all shadow-sm"
+                        title="Ask Socratic AI Tutor for conceptual help"
+                      >
+                        <span>✨ AI Tutor</span>
+                      </button>
                       <button
                         onClick={handleRun}
                         disabled={wsLoading}

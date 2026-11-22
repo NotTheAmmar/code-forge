@@ -1632,3 +1632,28 @@ export const getProblemAnalytics = async (idOrSlug: string): Promise<ProblemAnal
       average_execution_time_ms: 42,
     }))
 }
+
+// ── Socratic AI Tutor API ───────────────────────────────────────────────────
+
+export interface AITutorResponse {
+  reply: string
+  model: string
+  is_live: boolean
+}
+
+export const askAITutor = async (
+  slug: string,
+  message: string,
+  sourceCode?: string,
+  language?: Language,
+  examSessionId?: string
+): Promise<AITutorResponse> => {
+  return apiClient
+    .post<AITutorResponse>(`/problems/${slug}/ai-tutor`, {
+      message,
+      source_code: sourceCode ?? null,
+      language: language ?? 'python',
+      exam_session_id: examSessionId ?? null,
+    })
+    .then((r) => r.data)
+}

@@ -29,5 +29,8 @@ class Settings(BaseSettings):
     # Docker
     docker_host: str = "unix:///var/run/docker.sock"
 
+    # AI Tutor
+    gemini_api_key: str = ""
+
 
 settings = Settings()

@@ -5,6 +5,7 @@ from typing import Any
 
 import jwt
 import bcrypt
+import uuid
 
 # Fix passlib 1.7.4 compatibility with bcrypt >= 4.0.0 (prevents trapped AttributeError warning)
 if not hasattr(bcrypt, "__about__"):
@@ -44,18 +45,18 @@ def _create_token(
     return jwt.encode(data, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-def create_access_token(user_id: str, role: str) -> str:
+def create_access_token(user_id: str | uuid.UUID, role: str) -> str:
     """Create a short-lived access token for the given user."""
     return _create_token(
-        {"sub": user_id, "role": role, "type": "access"},
+        {"sub": str(user_id), "role": role, "type": "access"},
         timedelta(minutes=settings.jwt_access_token_expire_minutes),
     )
 
 
-def create_refresh_token(user_id: str) -> str:
+def create_refresh_token(user_id: str | uuid.UUID) -> str:
     """Create a long-lived refresh token for the given user."""
     return _create_token(
-        {"sub": user_id, "type": "refresh"},
+        {"sub": str(user_id), "type": "refresh"},
         timedelta(days=settings.jwt_refresh_token_expire_days),
     )
 
