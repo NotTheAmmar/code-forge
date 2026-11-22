@@ -286,7 +286,7 @@ exam_violations
 - [x] Add `--ulimit nofile=64:64` (prevents file descriptor exhaustion, verified with `ulimit -n`).
 - [x] Enforce tmpfs size limit: `--tmpfs /tmp:size=16m,noexec,nosuid` (tighter than previous 32m).
 - [x] Verified full test suite: **122/122 passed** across `tests/test_sandbox_cpp.py`, `tests/test_security.py`, and existing suites.
-- [ ] Add adversarial test cases to the test suite (`tests/test_security.py`):
+- [x] Add adversarial test cases to the test suite (`tests/test_security.py`):
   - Fork bomb (Python: `os.fork()` loop, C: `fork()` loop) → should hit pids-limit.
   - Memory bomb (`[0] * 10**9`) → should hit memory limit.
   - Network access (`import urllib.request; urllib.request.urlopen(...)`) → should fail (network disabled).
@@ -608,17 +608,17 @@ exam_violations
 - [x] Monitoring stack (Prometheus + Grafana + cAdvisor)
 
 ### New for Final Jury
-- [ ] **WebSocket** — real-time submission results — Frontend ✅ | Backend 📋 (Phase A1)
-- [ ] **C/C++ support** — 2 sandbox images built & tested, editor switcher updated — Frontend ✅ | Backend Sandbox Execution 📋 (Phase A2)
-- [ ] **Security hardening** — pids-limit, adversarial test suite, live demo — Config ✅ | Backend Sandbox Profile 📋 (Phase A2)
-- [ ] **Learning Modules** — text lessons, YouTube videos, practice problems, progress tracking — Frontend ✅ | Backend API 📋 (Phase A3)
-- [ ] **Proctored Exams** — fullscreen lockdown, tab-switch detection, copy/paste blocking, timed sessions, auto-submit, violation logging — Frontend ✅ | Backend API 📋 (Phase A4)
-- [ ] **Analytics Dashboard** — charts (bar, line), class-wide stats, per-student trends — Frontend ✅ | Backend API 📋 (Phase A5)
-- [ ] **Advanced Grading** — weighted test cases / partial credit — Frontend ✅ | Backend Scoring 📋 (Phase A5)
-- [ ] **Custom Input Mode** — student types own stdin, runs code — Frontend ✅ | Backend Endpoint 📋 (Phase A5)
+- [x] **WebSocket** — real-time submission results — Frontend ✅ | Backend ✅ (Phase A1: Redis Pub/Sub WS router `/ws/submissions/{id}`)
+- [x] **C/C++ support** — 2 sandbox images built & tested, editor switcher updated — Frontend ✅ | Backend ✅ (Phase A2: GCC 13/G++ 20 execution in sandbox)
+- [x] **Security hardening** — pids-limit, adversarial test suite, live demo — Config ✅ | Backend ✅ (Phase A2: pids_limit=64, nofile=64, tmpfs 16m noexec)
+- [x] **Learning Modules** — text lessons, YouTube videos, practice problems, progress tracking — Frontend ✅ | Backend ✅ (Phase A3: Modules, Contents, Progress)
+- [x] **Proctored Exams** — fullscreen lockdown, tab-switch detection, copy/paste blocking, timed sessions, auto-submit, violation logging — Frontend ✅ | Backend ✅ (Phase A4: Lockdown, Violations, Scoring)
+- [x] **Analytics Dashboard** — charts (bar, line), class-wide stats, per-student trends — Frontend ✅ | Backend ✅ (Phase A5: Course & Problem analytics)
+- [x] **Advanced Grading** — weighted test cases / partial credit — Frontend ✅ | Backend ✅ (Phase A5: weight-based scoring formula)
+- [x] **Custom Input Mode** — student types own stdin, runs code — Frontend ✅ | Backend ✅ (Phase A5: sandboxed arbitrary stdin runner)
 - [x] **Editor Upgrades** — auto-save drafts, keybinding options (VS Code/Vim/Emacs), 4-language switcher — Frontend ✅
-- [ ] **Cross-Platform Installer** — bash + PowerShell scripts, enhanced setup — Setup Script Updated ✅ | Polish 📋 (Phase A6)
-- [ ] **Deployment Polish** — health checks, restart policies, structured logging — Backend 📋 (Phase A6)
+- [x] **Cross-Platform Installer** — bash + PowerShell scripts, enhanced setup — Setup Script Updated ✅ | Backend ✅ (Phase A6: Linux, macOS, WSL2, Windows PS1 & BAT)
+- [x] **Deployment Polish** — health checks, restart policies, structured logging — Backend ✅ (Phase A6: /health, /health/ready, restart: unless-stopped)
 
 ---
 

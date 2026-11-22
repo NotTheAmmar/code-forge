@@ -1,256 +1,182 @@
 # CodeForge — Operations Runbook
 
-Quick reference for setting up, running, restarting, and tearing down the CodeForge stack.
+Quick reference for setting up, running, testing, restarting, and tearing down the CodeForge stack.
 
 ---
 
-## Service Map
+## 🗺️ Service Map
 
-| Container | Role | URL |
-|---|---|---|
-| `web` | Nginx — serves React frontend, proxies `/api/*` | http://localhost |
-| `api` | FastAPI — REST API + Swagger docs | http://localhost:8000/docs |
-| `worker` | Celery — Java sandbox execution engine | — |
-| `db` | PostgreSQL 16 — persistent data store | localhost:5432 |
-| `redis` | Redis 7 — task queue broker | localhost:6379 |
-| `prometheus` | Metrics collection | http://localhost:9090 |
-| `grafana` | Dashboards | http://localhost:3000 |
-| `cadvisor` | Container resource stats | http://localhost:8080 |
+| Container | Role | Port / URL | Health Check |
+|---|---|---|---|
+| `web` | Nginx — serves React frontend, proxies `/api/*` and `/ws/*` | http://localhost:80 | HTTP GET `/` |
+| `api` | FastAPI — REST API, WebSockets, Swagger docs | http://localhost:8000 (docs: `/docs`) | HTTP GET `/health/ready` |
+| `worker` | Celery — Python, Java, C, and C++ sandbox grading engine | — | Celery ping |
+| `db` | PostgreSQL 16 — persistent relational data store | localhost:5432 | `pg_isready` |
+| `redis` | Redis 7 — task queue broker, Pub/Sub channel & rate limiter | localhost:6379 | `redis-cli ping` |
+| `prometheus` | Prometheus metrics collection | http://localhost:9090 | HTTP GET `/-/healthy` |
+| `grafana` | Live infrastructure dashboards | http://localhost:3000 (admin / admin) | HTTP GET `/api/health` |
+| `cadvisor` | Container resource stats (CPU, memory, IO) | http://localhost:8080 | HTTP GET `/healthz` |
 
 ---
 
-## First-Time Setup
+## ⚡ Quick Turnkey Setup (Recommended)
 
-Run these **once** on a fresh clone. Order matters.
+CodeForge provides automated, single-command cross-platform installer scripts that verify Docker, configure environment variables, build all 4 sandbox images, run database migrations, and seed demo data:
+
+### On Linux, macOS, or Windows WSL2:
+```bash
+./codeforge-setup.sh
+```
+*(Use `./codeforge-setup.sh --build` to force rebuild application images).*
+
+### On Windows PowerShell (Native):
+```powershell
+powershell -ExecutionPolicy Bypass -File .\codeforge-setup.ps1
+```
+
+### On Windows CMD / File Explorer:
+Double-click `codeforge-setup.bat`.
+
+---
+
+## 🛠️ Manual First-Time Setup
+
+If setting up step-by-step manually:
 
 ```bash
-# 1. Copy environment config (defaults work for local dev)
+# 1. Copy environment variables
 cp .env.example .env
 
-# 2. Build the Java sandbox image
-#    Separate from docker compose — only needed once (or after sandbox changes)
+# 2. Build the 4 execution sandbox images (only needed once or after sandbox changes)
+docker build -t codeforge-sandbox-python ./sandbox/python
 docker build -t codeforge-sandbox-java ./sandbox/java
+docker build -t codeforge-sandbox-c ./sandbox/c
+docker build -t codeforge-sandbox-cpp ./sandbox/cpp
 
-# 3. Build and start all services
+# 3. Start all services
 docker compose up -d --build
 
-# 4. Run database migrations
+# 4. Apply database migrations
 docker compose exec api alembic upgrade head
 
-# 5. Load sample problems into the database
-docker compose exec api python manage.py load-problems ./problems/
-
-# 6. Open the app
-#    http://localhost            → frontend
-#    http://localhost:8000/docs  → Swagger UI
+# 5. Seed the database with demo courses, problems, modules, exams, and users
+docker compose exec api python manage.py seed
 ```
-
-> **Note:** Steps 4 and 5 are only needed on first run (or after resetting the database). They are idempotent — safe to re-run.
 
 ---
 
-## Daily Start / Stop
+## 🔑 Default Demo Credentials
+
+| Role | Email | Password | Pre-seeded Context |
+|---|---|---|---|
+| **Instructor** | `admin@codeforge.local` | `changeme` | Creator of CS101, all problems, lab sessions, learning modules, exams |
+| **Student (Hero)**| `student@codeforge.local`| `changeme` | "Alex Student" — ready for live grading, lab badge, and exam demos |
+| **Student** | `diana@codeforge.local` | `changeme` | "Diana Prince" — Top leaderboard scorer (3 badges) |
+| **Student** | `alice@codeforge.local` | `changeme` | "Alice Johnson" — 2 badges earned |
+| **Student** | `bob@codeforge.local`   | `changeme` | "Bob Smith" — 1 badge earned |
+| **Student** | `charlie@codeforge.local` | `changeme` | "Charlie Brown" — Baseline student |
+
+---
+
+## 🔄 Daily Start / Stop
 
 ```bash
-# Start all services (no rebuild)
+# Start all services in background
 docker compose up -d
 
-# Stop all services (preserves data volumes)
+# Stop all services (preserves database & volume data)
 docker compose down
 
-# Stop AND remove all data (full reset)
+# Stop and wipe ALL data volumes (clean reset)
 docker compose down -v
 ```
 
 ---
 
-## Rebuild After Code Changes
-
-Only rebuild the service(s) you changed — faster than rebuilding everything.
+## 🔨 Rebuild After Code Changes
 
 ```bash
-# Rebuild and restart backend (API + worker share the same image)
+# Backend code change (FastAPI or Celery worker)
 docker compose up -d --build api worker
 
-# Rebuild and restart frontend only
+# Frontend code change (React UI)
 docker compose up -d --build web
 
-# Rebuild everything
+# Rebuild all application services
 docker compose up -d --build
 ```
 
-> **Tip:** The sandbox image (`codeforge-sandbox-java`) is **not** part of `docker compose` — rebuild it manually when `./sandbox/java/Dockerfile` changes:
-> ```bash
-> docker build -t codeforge-sandbox-java ./sandbox/java
-> ```
-
 ---
 
-## Restart a Service
+## 🧪 Running Automated Tests
+
+CodeForge includes an extensive automated test suite covering authentication, courses, gradebook, lab sessions, badges, learning modules, proctored exams, anti-cheat tracking, analytics, custom stdin runner, and sandbox security isolation:
 
 ```bash
-docker compose restart api
-docker compose restart worker
-docker compose restart web
+# Run the complete test suite (145 tests)
+docker compose run --rm api pytest -v
+
+# Run specific domain test suites
+docker compose run --rm api pytest tests/test_security.py -v       # Sandbox security hardening & limits
+docker compose run --rm api pytest tests/test_exams.py -v          # Proctored exams & violation logging
+docker compose run --rm api pytest tests/test_modules.py -v        # Learning modules & curriculum
+docker compose run --rm api pytest tests/test_analytics.py -v      # Course & problem analytics
+docker compose run --rm api pytest tests/test_websocket.py -v      # Real-time WebSocket streaming
+docker compose run --rm api pytest tests/test_sandbox_cpp.py -v    # C and C++ compilation & execution
+docker compose run --rm api pytest tests/test_custom_input.py -v   # Sandboxed arbitrary stdin runner
 ```
 
 ---
 
-## Reset / Wipe Data
+## 🩺 Health & Readiness Monitoring
 
 ```bash
-# Wipe the database only (keeps other volumes)
-docker compose down
-docker volume rm code-forge_pg_data
-docker compose up -d
-docker compose exec api alembic upgrade head
-docker compose exec api python manage.py load-problems ./problems/
+# Liveness probe
+curl -s http://localhost:8000/health | jq .
 
-# Full wipe — removes ALL volumes (db, redis, grafana data)
-docker compose down -v
-# Then redo First-Time Setup steps 3–5
+# Readiness probe (verifies database & Redis connectivity)
+curl -s http://localhost:8000/health/ready | jq .
+
+# Inspect running container health status
+docker compose ps
 ```
 
 ---
 
-## Add / Update Problems
+## 📋 Problem Management
 
-Problems live in `./problems/<slug>/`. Each folder needs:
-- `problem.yaml` — title, difficulty, limits
-- `description.md` — problem statement (markdown)
-- `tests/01.in`, `tests/01.out`, etc.
+Problems are defined in YAML format under `./problems/<slug>/`:
 
 ```bash
-# After adding or editing a problem file:
+# Load all YAML problems into the database
 docker compose exec api python manage.py load-problems ./problems/
 
-# Load a single problem
+# Load a specific single problem
 docker compose exec api python manage.py load-problems ./problems/two-sum/
 ```
 
-The loader is **idempotent** — re-running it updates existing problems and adds new ones without dropping data.
-
 ---
 
-## View Logs
+## 🔍 Log Inspection
 
 ```bash
-# Follow all logs
-docker compose logs -f
-
-# Follow specific services
+# Stream API & Worker logs together
 docker compose logs -f api worker
 
-# Last 50 lines, no follow
-docker compose logs --tail=50 worker
+# Inspect last 100 lines of worker logs
+docker compose logs --tail=100 worker
+
+# Check database connection logs
+docker compose logs db
 ```
 
 ---
 
-## Run Tests
+## 🛡️ Sandbox Verification
+
+Check that no orphaned or zombie sandbox containers linger after code runs:
 
 ```bash
-# Fast API tests (SQLite in-memory, no Docker needed) — ~1s
-docker compose exec api pytest tests/test_api.py -v
-
-# Normalize unit tests — <1s
-docker compose exec api pytest tests/test_sandbox.py::TestNormalize -v
-
-# Sandbox integration tests (requires codeforge-sandbox-java image) — ~30s
-docker compose exec api pytest tests/test_sandbox.py -v -s -m sandbox
+docker ps --filter "name=codeforge-sandbox"
 ```
-
----
-
-## Database Migrations
-
-```bash
-# Apply all pending migrations
-docker compose exec api alembic upgrade head
-
-# Check current migration version
-docker compose exec api alembic current
-
-# Generate a new migration after changing ORM models
-docker compose exec api alembic revision --autogenerate -m "describe_your_change"
-# Review and commit the generated file in backend/alembic/versions/
-```
-
----
-
-## Monitoring
-
-| Service | URL | Default Login |
-|---|---|---|
-| Grafana | http://localhost:3000 | admin / admin |
-| Prometheus | http://localhost:9090 | — |
-| cAdvisor | http://localhost:8080 | — |
-
-Prometheus scrapes:
-- `api:8000/metrics` — FastAPI request metrics (via `prometheus-fastapi-instrumentator`)
-- `cadvisor:8080` — container CPU/memory/network stats
-
----
-
-## Troubleshooting
-
-### API returns 502 / frontend can't reach backend
-```bash
-docker compose ps                    # check all services are "Up"
-docker compose logs api --tail=30    # look for startup errors
-```
-
-### Worker not processing submissions (status stuck at "queued")
-```bash
-docker compose logs worker --tail=30
-docker compose exec worker celery -A app.worker.celery_app inspect active
-```
-
-### Sandbox fails with Docker permission error
-The worker container needs access to the Docker socket. Verify:
-```bash
-docker compose exec worker docker ps   # should list running containers
-```
-If that fails, check `/var/run/docker.sock` permissions on the host:
-```bash
-ls -la /var/run/docker.sock
-# Should be srw-rw---- or similar; add your user to the 'docker' group if needed
-sudo usermod -aG docker $USER && newgrp docker
-```
-
-### Migrations not applying / table not found
-```bash
-docker compose exec api alembic current    # see what's applied
-docker compose exec api alembic upgrade head
-```
-
-### Problems not showing in the UI
-```bash
-docker compose exec api python manage.py load-problems ./problems/
-curl http://localhost:8000/api/v1/problems   # should return JSON array
-```
-
-### Prometheus shows "api" target as DOWN
-Verify the metrics endpoint is reachable:
-```bash
-curl http://localhost:8000/metrics | head -20
-```
-
----
-
-## Useful One-Liners
-
-```bash
-# Check all container health
-docker compose ps
-
-# See resource usage
-docker stats --no-stream
-
-# Count active sandbox containers (should be 0 when idle)
-docker ps --filter ancestor=codeforge-sandbox-java --format '{{.Names}}'
-
-# Quick API smoke test
-curl -s http://localhost:8000/health | python3 -m json.tool
-curl -s http://localhost:8000/api/v1/problems | python3 -m json.tool
-```
+*(Should show 0 containers when idle).*

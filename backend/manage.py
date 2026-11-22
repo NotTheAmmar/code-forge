@@ -275,6 +275,12 @@ def main() -> None:
         help="Path to a problems directory or a single problem folder",
     )
 
+    # seed sub-command
+    subparsers.add_parser(
+        "seed",
+        help="Seed initial courses, problems, modules, exams, and demo users for Final Jury",
+    )
+
     args = parser.parse_args()
 
     if args.command == "load-problems":
@@ -284,6 +290,11 @@ def main() -> None:
             sys.exit(1)
         logger.info("Loading problems from: %s", path)
         load_problems(path)
+    elif args.command == "seed":
+        import asyncio
+        from app.seed import seed
+        logger.info("Seeding database with demo data...")
+        asyncio.run(seed())
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Database seeding script for CodeForge TA-2 demonstration.
+"""Database seeding script for CodeForge Final Jury demonstration.
 
 Seeds:
 1. Default Instructor: admin@codeforge.local / changeme
@@ -9,7 +9,7 @@ Seeds:
    - charlie@codeforge.local / changeme ("Charlie Brown")
    - diana@codeforge.local / changeme ("Diana Prince")
 3. Sample Course: CS101: Introduction to Programming (invite code: CS101A)
-4. Sample Problems (all 4 attached to CS101 with Java & Python starters and test cases):
+4. Sample Problems (attached to CS101 with Java, Python, C, and C++ starters and weighted test cases):
    - hello-world
    - two-sum
    - reverse-string
@@ -20,7 +20,14 @@ Seeds:
    - Alice: 3 solved, 2 badges
    - Bob: 2 solved, 1 badge
    - Charlie: 1 solved, 0 badges (baseline)
-   - Alex Student: 1 solved (ready for live live badge earning demo!)
+   - Alex Student: 1 solved (ready for live badge earning demo!)
+7. Learning Modules:
+   - Module 1: "Introduction to Python & Algorithms" (theory text, YouTube video embed, practice problem)
+   - Module 2: "Control Flow & Memory Safety" (theory text, video lecture, practice problem)
+8. Proctored Exam:
+   - "CS101 Midterm Examination: Algorithms & Data Structures" (60 mins, browser lockdown, anti-cheat detection)
+   - ExamSession with pre-seeded submissions and sample anti-cheat violation for instructor audit
+9. Analytics & Partial Credit data ready for instructor visualization.
 
 Idempotent: Safe to re-run multiple times without duplicate record conflicts.
 """
