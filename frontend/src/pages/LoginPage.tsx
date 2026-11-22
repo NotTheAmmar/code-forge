@@ -101,44 +101,6 @@ export default function LoginPage() {
               ))}
             </div>
 
-            {/* Quick Demo Sign-in */}
-            <div className="mb-6 p-3.5 bg-orange-500/5 dark:bg-orange-500/10 border border-orange-500/20 rounded-xl">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
-                  ⚡ Quick Demo Accounts
-                </span>
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500">1-click fill</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('login')
-                    setEmail('test@test.com')
-                    setPassword('password123')
-                    setError(null)
-                  }}
-                  className="px-2.5 py-1.5 text-xs font-semibold bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-orange-500 dark:hover:border-orange-500 rounded-lg text-zinc-700 dark:text-zinc-200 hover:text-orange-600 dark:hover:text-orange-400 transition shadow-sm text-left flex items-center justify-between"
-                >
-                  <span>Student</span>
-                  <span className="text-[10px] opacity-60">→</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('login')
-                    setEmail('admin@test.com')
-                    setPassword('password123')
-                    setError(null)
-                  }}
-                  className="px-2.5 py-1.5 text-xs font-semibold bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-orange-500 dark:hover:border-orange-500 rounded-lg text-zinc-700 dark:text-zinc-200 hover:text-orange-600 dark:hover:text-orange-400 transition shadow-sm text-left flex items-center justify-between"
-                >
-                  <span>Instructor</span>
-                  <span className="text-[10px] opacity-60">→</span>
-                </button>
-              </div>
-            </div>
-
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               {/* Name field — register only */}
               {mode === 'register' && (

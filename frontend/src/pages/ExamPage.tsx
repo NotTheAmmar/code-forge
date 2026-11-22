@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { useAuth } from '../context/AuthContext'
 import {
   getExamDetail,
   startExamSession,
@@ -20,6 +21,14 @@ import { useWebSocket } from '../hooks/useWebSocket'
 export default function ExamPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
+
+  // Instructors must not take exams; redirect them to results & audit dashboard
+  useEffect(() => {
+    if (user?.role === 'instructor' && id) {
+      navigate(`/exams/${id}/results`, { replace: true })
+    }
+  }, [user, id, navigate])
 
   // Exam info & session state
   const [exam, setExam] = useState<ExamDetail | null>(null)
@@ -174,24 +183,62 @@ export default function ExamPage() {
   useEffect(() => {
     if (!isStarted || !sessionId) return
 
-    // 1. Tab switch / visibility loss
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        const newCount = tabSwitchesCount + 1
-        setTabSwitchesCount(newCount)
+    let lastFocusLoss = 0
+    const triggerFocusLoss = (details: string) => {
+      const now = Date.now()
+      if (now - lastFocusLoss < 1000) return
+      lastFocusLoss = now
+
+      setTabSwitchesCount((prev) => {
+        const newCount = prev + 1
         setViolationsCount((v) => v + 1)
-        setViolationToast(`⚠ Focus lost / Tab switch detected (${newCount} switches)`)
+        setViolationToast(`⚠ Focus lost / Desktop switch detected (${newCount} switches)`)
 
         logExamViolation(sessionId, {
           violation_type: 'tab_switch',
-          details: `Visibility hidden. Tab switch #${newCount}`,
+          details: `${details}. Switch #${newCount}`,
         }).catch(() => {})
 
+        setTimeout(() => setViolationToast(null), 4000)
+        return newCount
+      })
+    }
+
+    // 1. Tab switch / visibility loss
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        triggerFocusLoss('Visibility hidden (tab switched)')
+      }
+    }
+
+    // 2. Desktop / workspace switch & window blur (Linux/Wayland, macOS, Windows)
+    const handleWindowBlur = () => {
+      triggerFocusLoss('Window blur / desktop switch')
+    }
+
+    // 3. Screenshot shortcut or PrintScreen key
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isPrintScreen = e.key === 'PrintScreen' || e.keyCode === 44
+      const isScreenshot =
+        (e.key.toLowerCase() === 's' && (e.shiftKey && (e.metaKey || e.ctrlKey))) ||
+        (e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === '5'))
+
+      if (isPrintScreen || isScreenshot) {
+        e.preventDefault()
+        setViolationsCount((v) => v + 1)
+        setViolationToast('⚠ Screenshot attempt detected & logged. Assessment integrity monitored.')
+        logExamViolation(sessionId, {
+          violation_type: 'focus_loss',
+          details: `Screenshot attempt detected via ${isPrintScreen ? 'PrintScreen' : 'Shortcut'}`,
+        }).catch(() => {})
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText('').catch(() => {})
+        }
         setTimeout(() => setViolationToast(null), 4000)
       }
     }
 
-    // 2. Fullscreen exit
+    // 4. Fullscreen exit
     const handleFullscreenChange = () => {
       if (exam?.fullscreen_required && !document.fullscreenElement) {
         setFullscreenAlert(true)
@@ -203,12 +250,12 @@ export default function ExamPage() {
       }
     }
 
-    // 3. Right-click context menu blocking
+    // 5. Right-click context menu blocking
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault()
     }
 
-    // 4. Copy-paste blocking
+    // 6. Copy-paste blocking
     const handlePaste = (e: ClipboardEvent) => {
       if (exam?.copy_paste_blocked) {
         e.preventDefault()
@@ -223,17 +270,21 @@ export default function ExamPage() {
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('blur', handleWindowBlur)
+    window.addEventListener('keydown', handleKeyDown)
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     document.addEventListener('contextmenu', handleContextMenu)
     document.addEventListener('paste', handlePaste)
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('blur', handleWindowBlur)
+      window.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
       document.removeEventListener('contextmenu', handleContextMenu)
       document.removeEventListener('paste', handlePaste)
     }
-  }, [isStarted, sessionId, exam, tabSwitchesCount])
+  }, [isStarted, sessionId, exam])
 
   // Active Problem
   const currentProblem = problems[activeProblemIndex]
@@ -355,12 +406,27 @@ export default function ExamPage() {
             </ul>
           </div>
 
-          <button
-            onClick={handleStartExam}
-            className="w-full py-3.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold tracking-wider uppercase transition-all shadow-lg shadow-orange-500/20"
-          >
-            I Understand & Start Proctored Exam →
-          </button>
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+            <button
+              onClick={() => {
+                if (exam.course_id) {
+                  navigate(`/courses/${exam.course_id}`)
+                } else {
+                  navigate(-1)
+                }
+              }}
+              className="w-full sm:w-1/3 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-xs font-bold uppercase tracking-wider transition border border-zinc-700"
+            >
+              ← Cancel / Return
+            </button>
+            <button
+              onClick={handleStartExam}
+              className="w-full sm:w-2/3 py-3.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-orange-500/20"
+            >
+              I Understand & Start Proctored Exam →
+            </button>
+          </div>
         </div>
       </div>
     )

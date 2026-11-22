@@ -1451,93 +1451,16 @@ export const getCourseModuleProgress = async (courseId: string): Promise<CourseP
 
 // ── Proctored Exams API ─────────────────────────────────────────────────────
 
-const MOCK_EXAMS: Record<string, ExamDetail[]> = {
-  default: [
-    {
-      id: 'exam-midterm-1',
-      course_id: 'default',
-      title: 'Midterm Exam: Algorithms & Problem Solving',
-      description: 'Strict proctored evaluation. Full-screen required, tab switches monitored.',
-      duration_minutes: 60,
-      starts_at: new Date(Date.now() - 3600000).toISOString(),
-      ends_at: new Date(Date.now() + 86400000 * 2).toISOString(),
-      is_active: true,
-      fullscreen_required: true,
-      tab_switch_limit: 3,
-      copy_paste_blocked: true,
-      problem_count: 2,
-      has_session: false,
-      session_status: null,
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      problems: [
-        {
-          id: 'two-sum-id',
-          slug: 'two-sum',
-          title: 'Two Sum Target Matcher',
-          difficulty: 'easy',
-          weight: 50,
-          order_index: 1,
-          description: 'Find two indices in the array that add up to the specified target integer.',
-          starter_code_java: `import java.util.Scanner;\npublic class Solution {\n    public static void main(String[] args) {\n        // Your exam code here\n    }\n}`,
-          starter_code_python: `def main():\n    # Your exam code here\n    pass\n\nif __name__ == '__main__':\n    main()`,
-          starter_code_c: `#include <stdio.h>\nint main() {\n    // Your exam code here\n    return 0;\n}`,
-          starter_code_cpp: `#include <iostream>\nusing namespace std;\nint main() {\n    // Your exam code here\n    return 0;\n}`,
-        },
-        {
-          id: 'hello-world-id',
-          slug: 'hello-world',
-          title: 'Hello World Warmup',
-          difficulty: 'easy',
-          weight: 50,
-          order_index: 2,
-          description: 'Read the name from standard input and output the formal greeting line.',
-          starter_code_java: `import java.util.Scanner;\npublic class Solution {\n    public static void main(String[] args) {\n        // Code here\n    }\n}`,
-          starter_code_python: `def main():\n    name = input()\n    print(f"Hello, {name}!")\n\nif __name__ == '__main__':\n    main()`,
-          starter_code_c: `#include <stdio.h>\nint main() {\n    char name[100];\n    if (scanf("%s", name) == 1) printf("Hello, %s!\\n", name);\n    return 0;\n}`,
-          starter_code_cpp: `#include <iostream>\n#include <string>\nusing namespace std;\nint main() {\n    string name;\n    if (cin >> name) cout << "Hello, " << name << "!\\n";\n    return 0;\n}`,
-        },
-      ],
-    },
-  ],
-}
-
 export const getCourseExams = async (courseId: string): Promise<Exam[]> => {
   return apiClient
     .get<Exam[]>(`/courses/${courseId}/exams`)
     .then((r) => r.data)
-    .catch(() => {
-      const exams = MOCK_EXAMS[courseId] || MOCK_EXAMS['default']
-      return exams.map((e) => ({
-        id: e.id,
-        course_id: courseId,
-        title: e.title,
-        description: e.description,
-        duration_minutes: e.duration_minutes,
-        starts_at: e.starts_at,
-        ends_at: e.ends_at,
-        is_active: e.is_active,
-        fullscreen_required: e.fullscreen_required,
-        tab_switch_limit: e.tab_switch_limit,
-        copy_paste_blocked: e.copy_paste_blocked,
-        problem_count: e.problems?.length || 0,
-        has_session: e.has_session,
-        session_status: e.session_status,
-        created_at: e.created_at,
-      }))
-    })
 }
 
 export const getExamDetail = async (examId: string): Promise<ExamDetail> => {
   return apiClient
     .get<ExamDetail>(`/exams/${examId}`)
     .then((r) => r.data)
-    .catch(() => {
-      for (const list of Object.values(MOCK_EXAMS)) {
-        const found = list.find((e) => e.id === examId)
-        if (found) return found
-      }
-      return MOCK_EXAMS['default'][0]
-    })
 }
 
 export const createExam = async (
@@ -1557,57 +1480,12 @@ export const createExam = async (
   return apiClient
     .post<ExamDetail>(`/courses/${courseId}/exams`, data)
     .then((r) => r.data)
-    .catch(() => {
-      const newExam: ExamDetail = {
-        id: 'exam-' + Math.random().toString(36).substring(2, 9),
-        course_id: courseId,
-        title: data.title,
-        description: data.description || null,
-        duration_minutes: data.duration_minutes,
-        starts_at: data.starts_at,
-        ends_at: data.ends_at,
-        is_active: true,
-        fullscreen_required: data.fullscreen_required ?? true,
-        tab_switch_limit: data.tab_switch_limit ?? 3,
-        copy_paste_blocked: data.copy_paste_blocked ?? true,
-        problem_count: data.problems.length,
-        created_at: new Date().toISOString(),
-        problems: data.problems.map((p, idx) => ({
-          id: p.problem_id,
-          slug: 'prob-' + p.problem_id,
-          title: `Exam Problem ${idx + 1}`,
-          difficulty: 'medium',
-          weight: p.weight,
-          order_index: p.order_index,
-          description: 'Problem description for exam problem.',
-        })),
-      }
-      if (!MOCK_EXAMS[courseId]) MOCK_EXAMS[courseId] = []
-      MOCK_EXAMS[courseId].push(newExam)
-      return newExam
-    })
 }
 
 export const startExamSession = async (examId: string): Promise<ExamSessionStartResponse> => {
   return apiClient
     .post<ExamSessionStartResponse>(`/exams/${examId}/start`)
     .then((r) => r.data)
-    .catch(async () => {
-      const exam = await getExamDetail(examId)
-      exam.has_session = true
-      exam.session_status = 'in_progress'
-      return {
-        session_id: 'session-' + Math.random().toString(36).substring(2, 9),
-        exam_id: exam.id,
-        started_at: new Date().toISOString(),
-        duration_seconds: exam.duration_minutes * 60,
-        remaining_seconds: exam.duration_minutes * 60,
-        fullscreen_required: exam.fullscreen_required,
-        tab_switch_limit: exam.tab_switch_limit,
-        copy_paste_blocked: exam.copy_paste_blocked,
-        problems: exam.problems || [],
-      }
-    })
 }
 
 export const logExamViolation = async (
@@ -1620,18 +1498,6 @@ export const logExamViolation = async (
   return apiClient
     .post<ExamViolationResponse>(`/exam-sessions/${sessionId}/violations`, violation)
     .then((r) => r.data)
-    .catch(() => {
-      console.warn("Logged local exam violation:", violation)
-      return {
-        id: 'viol-' + Math.random().toString(36).substring(2, 9),
-        exam_session_id: sessionId,
-        violation_type: violation.violation_type,
-        total_violations: 1,
-        tab_switches_remaining: 2,
-        flagged: false,
-        occurred_at: new Date().toISOString(),
-      }
-    })
 }
 
 export const submitExamSession = async (
@@ -1643,122 +1509,18 @@ export const submitExamSession = async (
       is_auto_submitted: isAutoSubmitted,
     })
     .then((r) => r.data)
-    .catch(async () => {
-      const exam = await getExamDetail(examId)
-      exam.session_status = 'submitted'
-      const problemScores: Record<string, number> = {}
-      let total = 0
-      exam.problems?.forEach((p) => {
-        problemScores[p.id] = p.weight
-        total += p.weight
-      })
-      return {
-        session_id: 'session-completed',
-        exam_id: examId,
-        submitted_at: new Date().toISOString(),
-        is_auto_submitted: isAutoSubmitted,
-        total_score: total,
-        problem_scores: problemScores,
-        violation_count: 0,
-      }
-    })
 }
 
 export const getExamResults = async (examId: string): Promise<ExamResultsDashboard> => {
   return apiClient
     .get<ExamResultsDashboard>(`/exams/${examId}/results`)
     .then((r) => r.data)
-    .catch(async () => {
-      const exam = await getExamDetail(examId)
-      return {
-        exam_id: examId,
-        title: exam.title,
-        total_enrolled: 24,
-        submissions_count: 22,
-        average_score: 86.4,
-        students: [
-          {
-            user_id: 'std-1',
-            name: 'Alex Johnson',
-            email: 'alex@codeforge.edu',
-            status: 'submitted',
-            started_at: new Date(Date.now() - 3600000).toISOString(),
-            submitted_at: new Date(Date.now() - 600000).toISOString(),
-            is_auto_submitted: false,
-            total_score: 100,
-            violation_count: 0,
-            violations: [],
-          },
-          {
-            user_id: 'std-2',
-            name: 'Sarah Connor',
-            email: 'sarah@codeforge.edu',
-            status: 'submitted',
-            started_at: new Date(Date.now() - 3600000).toISOString(),
-            submitted_at: new Date(Date.now() - 400000).toISOString(),
-            is_auto_submitted: false,
-            total_score: 85,
-            violation_count: 1,
-            violations: [
-              {
-                violation_type: 'tab_switch',
-                details: 'Visibility state changed to hidden (1 switch)',
-                occurred_at: new Date(Date.now() - 1500000).toISOString(),
-              },
-            ],
-          },
-          {
-            user_id: 'std-3',
-            name: 'Michael Scott',
-            email: 'michael@codeforge.edu',
-            status: 'submitted',
-            started_at: new Date(Date.now() - 3600000).toISOString(),
-            submitted_at: new Date(Date.now() - 100000).toISOString(),
-            is_auto_submitted: true,
-            total_score: 55,
-            violation_count: 4,
-            violations: [
-              {
-                violation_type: 'tab_switch',
-                details: 'Tab switch detected at 14:12',
-                occurred_at: new Date(Date.now() - 2500000).toISOString(),
-              },
-              {
-                violation_type: 'fullscreen_exit',
-                details: 'User pressed ESC to exit fullscreen mode',
-                occurred_at: new Date(Date.now() - 2000000).toISOString(),
-              },
-              {
-                violation_type: 'copy_paste',
-                details: 'Blocked attempt to paste clipboard content',
-                occurred_at: new Date(Date.now() - 1200000).toISOString(),
-              },
-              {
-                violation_type: 'tab_switch',
-                details: 'Tab switch limit exceeded',
-                occurred_at: new Date(Date.now() - 800000).toISOString(),
-              },
-            ],
-          },
-        ],
-      }
-    })
 }
 
 export const getMyExamResult = async (examId: string): Promise<ExamMyResult> => {
   return apiClient
     .get<ExamMyResult>(`/exams/${examId}/my-result`)
     .then((r) => r.data)
-    .catch(() => ({
-      exam_id: examId,
-      total_score: 90,
-      submitted_at: new Date().toISOString(),
-      is_auto_submitted: false,
-      problem_scores: {
-        'two-sum-id': 50,
-        'hello-world-id': 40,
-      },
-    }))
 }
 
 // ── Analytics API ───────────────────────────────────────────────────────────

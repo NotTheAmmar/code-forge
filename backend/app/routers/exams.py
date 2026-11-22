@@ -446,6 +446,13 @@ async def start_exam_session(
     exam = await _get_exam_or_404(exam_id, db)
     await _ensure_course_access(exam.course, current_user, db)
 
+    # Instructors must not take exams as examinees
+    if current_user.role == "instructor" or exam.course.created_by == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Instructors cannot take exams. Review submissions in the Exam Results & Integrity Dashboard.",
+        )
+
     if not exam.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

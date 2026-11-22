@@ -321,6 +321,10 @@ def test_exam_detail_concealment_and_start_flow(instr_client, student_client, ou
     assert resume_resp.status_code == 201
     assert resume_resp.json()["session_id"] == session_id
 
+    # Instructors must be forbidden from starting exam sessions
+    instr_start = instr_client.post(f"/api/v1/exams/{exam_id}/start")
+    assert instr_start.status_code == 403
+
     # Log violations
     v1_resp = student_client.post(
         f"/api/v1/exam-sessions/{session_id}/violations",

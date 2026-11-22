@@ -1,10 +1,11 @@
 /**
- * CodeEditor — Monaco Editor wrapper with multi-language & keybinding support.
+ * CodeEditor — Monaco Editor wrapper with multi-language, keybinding, and IntelliSense support.
  */
 
 import Editor, { OnMount } from '@monaco-editor/react'
 import { useRef } from 'react'
 import { useTheme } from '../context/ThemeContext'
+import { registerCodeForgeCompletions } from '../utils/monacoCompletions'
 
 export type KeybindingMode = 'vscode' | 'vim' | 'emacs'
 
@@ -41,8 +42,13 @@ export default function CodeEditor({
     }
   })()
 
-  const handleEditorDidMount: OnMount = (editor) => {
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
+
+    // Register rich autocompletion & dot suggestions for C, C++, Python, Java
+    if (monaco) {
+      registerCodeForgeCompletions(monaco)
+    }
 
     // Apply cursor & styling options based on keybinding preference
     if (keybindingMode === 'vim') {
@@ -85,6 +91,40 @@ export default function CodeEditor({
           wordWrap: 'on',
           cursorStyle: keybindingMode === 'vim' ? 'block' : 'line',
           cursorBlinking: keybindingMode === 'vim' ? 'solid' : 'smooth',
+
+          // Rich IntelliSense & Autocompletion settings
+          quickSuggestions: {
+            other: true,
+            comments: false,
+            strings: true,
+          },
+          suggestOnTriggerCharacters: true,
+          acceptSuggestionOnCommitCharacter: true,
+          acceptSuggestionOnEnter: 'on',
+          tabCompletion: 'on',
+          parameterHints: {
+            enabled: true,
+            cycle: true,
+          },
+          wordBasedSuggestions: 'allDocuments',
+          suggest: {
+            showMethods: true,
+            showFunctions: true,
+            showConstructors: true,
+            showFields: true,
+            showVariables: true,
+            showClasses: true,
+            showStructs: true,
+            showInterfaces: true,
+            showModules: true,
+            showProperties: true,
+            showKeywords: true,
+            showSnippets: true,
+            preview: true,
+            filterGraceful: true,
+            shareSuggestSelections: true,
+          },
+
           scrollbar: {
             vertical: 'visible',
             horizontal: 'visible',
