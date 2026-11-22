@@ -335,32 +335,147 @@ print_summary() {
     echo -e "${BOLD}Supported Languages:${NC}"
     echo -e "  - Python (3.12), Java (OpenJDK 21), C (GCC 13), C++ (G++ 13, C++20)"
     echo ""
-    echo -e "${BOLD}Useful Commands:${NC}"
+    echo -e "${BOLD}Platform Control Commands:${NC}"
+    echo -e "  - Stop platform:      ./codeforge-setup.sh --stop"
+    echo -e "  - Factory reset:      ./codeforge-setup.sh --reset"
+    echo -e "  - Service status:     ./codeforge-setup.sh --status"
+    echo -e "  - Run full tests:     ./codeforge-setup.sh --test"
+    echo -e "  - Re-seed demo data:  ./codeforge-setup.sh --seed"
+    echo -e "  - Rebuild & launch:   ./codeforge-setup.sh --build"
+    echo ""
+    echo -e "${BOLD}Docker Direct Commands:${NC}"
     echo -e "  - View API logs:      ${COMPOSE_CMD} logs -f api"
     echo -e "  - View Worker logs:   ${COMPOSE_CMD} logs -f worker"
-    echo -e "  - Run full tests:     ${COMPOSE_CMD} run --rm api pytest -v"
-    echo -e "  - Stop platform:      ${COMPOSE_CMD} down"
+    echo -e "  - Check containers:   ${COMPOSE_CMD} ps"
     echo ""
     echo -e "${GREEN}${BOLD}========================================================================${NC}"
 }
 
+show_help() {
+    cat << EOF
+CodeForge CLI & Turnkey Platform Manager
+
+Usage:
+  ./codeforge-setup.sh [COMMAND | OPTION]
+
+Commands & Options:
+  (no args)             Launch or update the CodeForge platform stack
+  --build, -b           Rebuild application containers (api, web) and launch
+  --stop, stop, down    Gracefully stop all platform containers
+  --reset, reset        Completely wipe all containers and data volumes (-v),
+                        re-launch, run migrations, and re-seed clean demo data
+  --status, status, ps  Show running container statuses and test API readiness probe
+  --test, test          Run the complete 145-test automated pytest suite
+  --seed, seed          Re-seed the database without restarting containers
+  --help, -h            Show this help reference
+
+Examples:
+  ./codeforge-setup.sh          # Quick launch
+  ./codeforge-setup.sh --stop   # Stop everything
+  ./codeforge-setup.sh --reset  # Clean factory reset
+  ./codeforge-setup.sh --status # Check health & container status
+EOF
+}
+
 # ── Main Flow ─────────────────────────────────────────────────────────────────
 main() {
-    local rebuild="false"
-    if [[ "${1:-}" == "--build" || "${1:-}" == "-b" ]]; then
-        rebuild="true"
-    fi
+    local cmd="${1:-}"
 
-    banner
-    detect_os
-    check_prerequisites
-    check_ports
-    configure_env
-    build_sandboxes "${rebuild}"
-    verify_sandboxes
-    start_services "${rebuild}"
-    run_migrations_and_seed
-    print_summary
+    case "${cmd}" in
+        --help|-h|help)
+            banner
+            show_help
+            exit 0
+            ;;
+        --stop|stop|--down|down)
+            banner
+            detect_os
+            check_prerequisites
+            info "Stopping CodeForge service stack..."
+            ${COMPOSE_CMD} down
+            success "All CodeForge services have been gracefully stopped."
+            exit 0
+            ;;
+        --status|status|ps)
+            banner
+            detect_os
+            check_prerequisites
+            info "Checking CodeForge service status..."
+            ${COMPOSE_CMD} ps
+            echo ""
+            info "Testing API readiness probe..."
+            if command -v curl >/dev/null 2>&1; then
+                curl -s http://localhost:8000/health/ready || echo "API not responding"
+                echo ""
+            fi
+            exit 0
+            ;;
+        --test|test)
+            banner
+            detect_os
+            check_prerequisites
+            info "Running complete CodeForge automated test suite (145 tests)..."
+            ${COMPOSE_CMD} run --rm api pytest -v
+            exit 0
+            ;;
+        --seed|seed)
+            banner
+            detect_os
+            check_prerequisites
+            info "Re-seeding database with demo data..."
+            ${COMPOSE_CMD} exec -T api python manage.py seed
+            success "Database re-seeded successfully."
+            exit 0
+            ;;
+        --reset|reset)
+            banner
+            detect_os
+            check_prerequisites
+            warn "Initiating full platform reset (wiping database, redis, and container volumes)..."
+            ${COMPOSE_CMD} down -v
+            success "All data volumes cleared."
+            info "Re-launching platform from clean state..."
+            check_ports
+            configure_env
+            build_sandboxes "false"
+            verify_sandboxes
+            start_services "false"
+            run_migrations_and_seed
+            print_summary
+            exit 0
+            ;;
+        --build|-b)
+            banner
+            detect_os
+            check_prerequisites
+            check_ports
+            configure_env
+            build_sandboxes "true"
+            verify_sandboxes
+            start_services "true"
+            run_migrations_and_seed
+            print_summary
+            exit 0
+            ;;
+        "")
+            banner
+            detect_os
+            check_prerequisites
+            check_ports
+            configure_env
+            build_sandboxes "false"
+            verify_sandboxes
+            start_services "false"
+            run_migrations_and_seed
+            print_summary
+            ;;
+        *)
+            error "Unknown option or command: ${cmd}"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
 }
 
 main "$@"

@@ -183,24 +183,55 @@ Explain the container sandbox parameters:
 
 ---
 
+## 🛑 Stopping & Resetting the Platform
+
+### Stopping CodeForge (Preserving All Data)
+To pause or stop all running services without losing any course data, submissions, or user accounts:
+
+```bash
+# Using the setup script (Linux / macOS / WSL2)
+./codeforge-setup.sh --stop
+
+# Or using Windows PowerShell
+.\codeforge-setup.ps1 -Stop
+
+# Or using native Docker Compose directly
+docker compose down
+```
+
+---
+
+### Factory Reset (Completely Wipe & Reinitialize)
+To completely wipe all database contents, redis state, and volumes, and re-launch a pristine environment with fresh seed data:
+
+```bash
+# Single-command factory reset (Linux / macOS / WSL2)
+./codeforge-setup.sh --reset
+
+# Or on Windows PowerShell
+.\codeforge-setup.ps1 -Reset
+
+# Or manually via Docker Compose
+docker compose down -v
+docker compose up -d
+docker compose exec api alembic upgrade head
+docker compose exec api python manage.py seed
+```
+
+---
+
 ## 🔧 Maintenance & Diagnostic Commands
 
 ```bash
+# Check service health and status
+./codeforge-setup.sh --status
+
 # Run all 145 automated tests
-docker compose run --rm api pytest -v
+./codeforge-setup.sh --test
+
+# Re-seed database demo data (idempotent)
+./codeforge-setup.sh --seed
 
 # Tail backend and worker logs
 docker compose logs -f api worker
-
-# Reset database to fresh seeded state
-docker compose exec api python manage.py seed
-
-# Check container health status
-docker compose ps
-
-# Clean teardown (preserving database volumes)
-docker compose down
-
-# Full wipe (removes database & redis volumes)
-docker compose down -v
 ```

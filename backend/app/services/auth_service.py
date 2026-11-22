@@ -4,6 +4,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
+import bcrypt
+
+# Fix passlib 1.7.4 compatibility with bcrypt >= 4.0.0 (prevents trapped AttributeError warning)
+if not hasattr(bcrypt, "__about__"):
+    class _About:
+        __version__ = getattr(bcrypt, "__version__", "4.0.0")
+    bcrypt.__about__ = _About()
+
 from passlib.context import CryptContext
 
 from app.config import settings

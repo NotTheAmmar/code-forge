@@ -15,7 +15,13 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Build
+    [switch]$Build,
+    [switch]$Stop,
+    [switch]$Reset,
+    [switch]$Status,
+    [switch]$Test,
+    [switch]$Seed,
+    [switch]$Help
 )
 
 $ErrorActionPreference = "Stop"
@@ -240,11 +246,13 @@ function Show-Summary {
     Write-Host "Supported Languages:" -ForegroundColor White
     Write-Host "  - Python (3.12), Java (OpenJDK 21), C (GCC 13), C++ (G++ 13, C++20)"
     Write-Host ""
-    Write-Host "Useful Commands:" -ForegroundColor White
-    Write-Host "  - View API logs:      docker compose logs -f api"
-    Write-Host "  - View Worker logs:   docker compose logs -f worker"
-    Write-Host "  - Run full tests:     docker compose run --rm api pytest -v"
-    Write-Host "  - Stop platform:      docker compose down"
+    Write-Host "Platform Control Commands:" -ForegroundColor White
+    Write-Host "  - Stop platform:      .\codeforge-setup.ps1 -Stop"
+    Write-Host "  - Factory reset:      .\codeforge-setup.ps1 -Reset"
+    Write-Host "  - Service status:     .\codeforge-setup.ps1 -Status"
+    Write-Host "  - Run full tests:     .\codeforge-setup.ps1 -Test"
+    Write-Host "  - Re-seed demo data:  .\codeforge-setup.ps1 -Seed"
+    Write-Host "  - Rebuild & launch:   .\codeforge-setup.ps1 -Build"
     Write-Host ""
     Write-Host "========================================================================" -ForegroundColor Green
 }
@@ -252,6 +260,51 @@ function Show-Summary {
 # ── Execution ─────────────────────────────────────────────────────────────────
 Show-Banner
 Test-Prerequisites
+
+if ($Help) {
+    Write-Host "CodeForge Windows PowerShell Turnkey Manager" -ForegroundColor Cyan
+    Write-Host "Usage: .\codeforge-setup.ps1 [-Build] [-Stop] [-Reset] [-Status] [-Test] [-Seed] [-Help]"
+    exit 0
+}
+
+if ($Stop) {
+    Write-Info "Stopping CodeForge service stack..."
+    docker compose down
+    Write-Success "All CodeForge services have been gracefully stopped."
+    exit 0
+}
+
+if ($Status) {
+    Write-Info "Checking CodeForge service status..."
+    docker compose ps
+    try {
+        $res = Invoke-RestMethod -Uri "http://localhost:8000/health/ready" -TimeoutSec 5
+        Write-Success ("API Readiness: " + ($res | ConvertTo-Json -Compress))
+    } catch {
+        Write-Warn "API readiness probe unreachable or not ready."
+    }
+    exit 0
+}
+
+if ($Test) {
+    Write-Info "Running complete CodeForge automated test suite (145 tests)..."
+    docker compose run --rm api pytest -v
+    exit 0
+}
+
+if ($Seed) {
+    Write-Info "Re-seeding database with demo data..."
+    docker compose exec -T api python manage.py seed
+    Write-Success "Database re-seeded successfully."
+    exit 0
+}
+
+if ($Reset) {
+    Write-Warn "Initiating full platform reset (wiping database and cache volumes)..."
+    docker compose down -v
+    Write-Success "All data volumes cleared."
+}
+
 Test-Ports
 Set-EnvironmentFile
 Build-Sandboxes -force $Build

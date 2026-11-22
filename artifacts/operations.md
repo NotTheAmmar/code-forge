@@ -78,17 +78,23 @@ docker compose exec api python manage.py seed
 
 ---
 
-## 🔄 Daily Start / Stop
+## 🔄 Daily Start / Stop & Full Reset
 
 ```bash
-# Start all services in background
-docker compose up -d
+# Start all services (quick launcher)
+./codeforge-setup.sh
 
 # Stop all services (preserves database & volume data)
-docker compose down
+./codeforge-setup.sh --stop
+# (or: docker compose down)
 
-# Stop and wipe ALL data volumes (clean reset)
-docker compose down -v
+# Completely wipe and factory-reset (clean reset of DB, Redis, and seed data)
+./codeforge-setup.sh --reset
+# (or: docker compose down -v && ./codeforge-setup.sh)
+
+# Inspect platform status & health probes
+./codeforge-setup.sh --status
+# (or: docker compose ps)
 ```
 
 ---
