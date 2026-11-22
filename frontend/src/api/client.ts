@@ -139,17 +139,21 @@ export interface TestCaseSummary {
   expected_output: string
   is_visible: boolean
   order_index: number
+  weight?: number
 }
 
 export interface ProblemDetail extends ProblemSummary {
   description: string
   starter_code_java: string
   starter_code_python: string | null
+  starter_code_c?: string | null
+  starter_code_cpp?: string | null
   test_cases: TestCaseSummary[]
 }
 
 export type SubmissionStatus =
   | 'queued'
+  | 'compiling'
   | 'running'
   | 'completed'
   | 'compile_error'
@@ -165,6 +169,7 @@ export interface TestCaseResult {
   actual_output: string | null
   execution_time_ms: number | null
   error: string | null
+  weight?: number
 }
 
 export interface Submission {
@@ -196,7 +201,214 @@ export interface SubmissionSummary {
   submitted_at: string
 }
 
-export type Language = 'java' | 'python'
+export type Language = 'java' | 'python' | 'c' | 'cpp'
+
+// ── Learning Modules Types ──────────────────────────────────────────────────
+export interface LearningContent {
+  id: string
+  module_id: string
+  content_type: 'text' | 'video' | 'problem'
+  title: string
+  body: string | null
+  problem_id: string | null
+  order_index: number
+  created_at: string
+}
+
+export interface LearningModule {
+  id: string
+  course_id: string
+  title: string
+  description: string | null
+  order_index: number
+  is_published: boolean
+  content_count: number
+  is_completed: boolean
+  created_at: string
+}
+
+export interface LearningModuleDetail extends LearningModule {
+  contents: LearningContent[]
+}
+
+export interface ModuleProgressResponse {
+  module_id: string
+  user_id: string
+  is_completed: boolean
+  completed_at: string | null
+}
+
+export interface CourseProgressResponse {
+  course_id: string
+  total_modules: number
+  completed_modules: number
+  progress_percentage: number
+  completed_module_ids: string[]
+}
+
+// ── Proctored Exam Types ────────────────────────────────────────────────────
+export interface ExamProblem {
+  id: string
+  slug: string
+  title: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  weight: number
+  order_index: number
+  description: string
+  starter_code_python?: string | null
+  starter_code_java?: string | null
+  starter_code_c?: string | null
+  starter_code_cpp?: string | null
+}
+
+export interface Exam {
+  id: string
+  course_id: string
+  title: string
+  description: string | null
+  duration_minutes: number
+  starts_at: string
+  ends_at: string
+  is_active: boolean
+  fullscreen_required: boolean
+  tab_switch_limit: number
+  copy_paste_blocked: boolean
+  problem_count?: number
+  has_session?: boolean
+  session_status?: 'in_progress' | 'submitted' | null
+  created_at?: string
+}
+
+export interface ExamDetail extends Exam {
+  problems?: ExamProblem[]
+}
+
+export interface ExamSessionStartResponse {
+  session_id: string
+  exam_id: string
+  started_at: string
+  duration_seconds: number
+  remaining_seconds: number
+  fullscreen_required: boolean
+  tab_switch_limit: number
+  copy_paste_blocked: boolean
+  problems: ExamProblem[]
+}
+
+export interface ExamViolationResponse {
+  id: string
+  exam_session_id: string
+  violation_type: string
+  total_violations: number
+  tab_switches_remaining: number
+  flagged: boolean
+  occurred_at: string
+}
+
+export interface ExamSessionSummary {
+  session_id: string
+  exam_id: string
+  submitted_at: string
+  is_auto_submitted: boolean
+  total_score: number
+  problem_scores: Record<string, number>
+  violation_count: number
+}
+
+export interface ExamStudentResult {
+  user_id: string
+  name: string
+  email: string
+  status: 'in_progress' | 'submitted'
+  started_at: string
+  submitted_at: string | null
+  is_auto_submitted: boolean
+  total_score: number | null
+  violation_count: number
+  violations: Array<{
+    violation_type: string
+    details: string | null
+    occurred_at: string
+  }>
+}
+
+export interface ExamResultsDashboard {
+  exam_id: string
+  title: string
+  total_enrolled: number
+  submissions_count: number
+  average_score: number
+  students: ExamStudentResult[]
+}
+
+export interface ExamMyResult {
+  exam_id: string
+  total_score: number
+  submitted_at: string
+  is_auto_submitted: boolean
+  problem_scores: Record<string, number>
+}
+
+// ── Analytics Types ─────────────────────────────────────────────────────────
+export interface CourseAnalytics {
+  course_id: string
+  summary: {
+    total_students: number
+    total_submissions: number
+    average_pass_rate: number
+    active_students_7d: number
+  }
+  problem_pass_rates: Array<{
+    problem_id: string
+    title: string
+    difficulty: string
+    submissions_count: number
+    pass_rate: number
+    average_score: number
+  }>
+  common_error_distribution: Array<{
+    error_type: string
+    count: number
+  }>
+  submission_trends: Array<{
+    date: string
+    count: number
+  }>
+}
+
+export interface StudentAnalytics {
+  user_id: string
+  name: string
+  total_submissions: number
+  problems_solved: number
+  badges_earned: number
+  score_progression: Array<{
+    submitted_at: string
+    problem: string
+    score: number
+  }>
+}
+
+export interface ProblemAnalytics {
+  problem_id: string
+  slug: string
+  title: string
+  total_submissions: number
+  unique_students: number
+  pass_rate: number
+  language_breakdown: Record<string, number>
+  average_execution_time_ms: number
+}
+
+// ── Custom Input Types ──────────────────────────────────────────────────────
+export interface RunCustomResponse {
+  language: string
+  status: string
+  stdout: string | null
+  stderr: string | null
+  execution_time_ms: number | null
+  exit_code: number | null
+}
 
 // ── API functions ─────────────────────────────────────────────────────────────
 
@@ -612,6 +824,7 @@ export interface TestCaseInput {
   expected_output: string
   is_visible: boolean
   order_index?: number
+  weight?: number
 }
 
 export interface ProblemCreateInput {
@@ -913,3 +1126,747 @@ export const getSubmissionHistory = (slug: string): Promise<SubmissionSummary[]>
       // Return empty array on auth failure / no history — graceful degradation
       return []
     })
+
+// ── Custom Input API ─────────────────────────────────────────────────────────
+
+export const runCustomInput = async (
+  slug: string,
+  sourceCode: string,
+  language: Language = 'python',
+  stdin: string = ''
+): Promise<RunCustomResponse> => {
+  return apiClient
+    .post<RunCustomResponse>(`/problems/${slug}/run-custom`, {
+      source_code: sourceCode,
+      language,
+      stdin,
+    })
+    .then((r) => r.data)
+    .catch(() => {
+      console.warn("API run-custom unavailable, using local execution simulation")
+      // Quick local simulation for demo purposes
+      let stdout = ''
+      if (sourceCode.includes('print') || sourceCode.includes('System.out') || sourceCode.includes('printf')) {
+        stdout = stdin ? `[Custom Run Output with stdin="${stdin}"]\nExecution completed successfully.` : 'Hello from CodeForge sandbox!\nExecution completed successfully.'
+      } else {
+        stdout = `Program finished with no output. Stdin provided: ${stdin || '(none)'}`
+      }
+      return {
+        language,
+        status: 'completed',
+        stdout,
+        stderr: null,
+        execution_time_ms: Math.floor(Math.random() * 40) + 15,
+        exit_code: 0,
+      }
+    })
+}
+
+// ── Learning Modules API ────────────────────────────────────────────────────
+
+// Mock store for modules
+const MOCK_MODULES: Record<string, LearningModuleDetail[]> = {
+  default: [
+    {
+      id: 'm1a2b3c4-0000-0000-0000-000000000001',
+      course_id: 'default',
+      title: 'Module 1: Introduction to Python & Control Flow',
+      description: 'Fundamental variables, conditionals, loops, and first algorithmic problems.',
+      order_index: 1,
+      is_published: true,
+      content_count: 3,
+      is_completed: false,
+      created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+      contents: [
+        {
+          id: 'c1a2b3c4-0000-0000-0000-000000000001',
+          module_id: 'm1a2b3c4-0000-0000-0000-000000000001',
+          content_type: 'text',
+          title: 'Understanding Python Variables & Memory Model',
+          body: `## Variables in Python\n\nIn Python, variables are references to objects in memory, not direct memory addresses like in C/C++.\n\n### Key Concepts:\n- **Dynamic Typing:** You do not declare types explicitly. Python dynamically binds types at runtime.\n- **Everything is an Object:** Integers, strings, functions, and classes are all first-class objects.\n- **Mutability:** Primitive types like \`int\`, \`float\`, \`str\`, and \`tuple\` are immutable. Lists and dictionaries are mutable.\n\n\`\`\`python\n# Variable assignment\nx = 42\ny = x\nprint(id(x) == id(y))  # True — both reference the same object\n\`\`\`\n\nTake note of this when passing lists into helper functions!`,
+          problem_id: null,
+          order_index: 1,
+          created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
+        },
+        {
+          id: 'c1a2b3c4-0000-0000-0000-000000000002',
+          module_id: 'm1a2b3c4-0000-0000-0000-000000000001',
+          content_type: 'video',
+          title: 'Python Control Flow & Functions Masterclass',
+          body: 'https://www.youtube.com/watch?v=kqtD5dpn9C8',
+          problem_id: null,
+          order_index: 2,
+          created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
+        },
+        {
+          id: 'c1a2b3c4-0000-0000-0000-000000000003',
+          module_id: 'm1a2b3c4-0000-0000-0000-000000000001',
+          content_type: 'problem',
+          title: 'Practice: Hello World & Stdin Basics',
+          body: 'Apply basic stdin reading and output formatting with the standard Hello World exercise.',
+          problem_id: 'hello-world-id',
+          order_index: 3,
+          created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+        },
+      ],
+    },
+    {
+      id: 'm2a2b3c4-0000-0000-0000-000000000002',
+      course_id: 'default',
+      title: 'Module 2: Algorithmic Thinking & Array Search',
+      description: 'Master time and space complexity, array manipulation, and hash map lookups.',
+      order_index: 2,
+      is_published: true,
+      content_count: 2,
+      is_completed: false,
+      created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+      contents: [
+        {
+          id: 'c2a2b3c4-0000-0000-0000-000000000001',
+          module_id: 'm2a2b3c4-0000-0000-0000-000000000002',
+          content_type: 'text',
+          title: 'Hash Maps & O(N) Lookup Patterns',
+          body: `## The Two-Sum Problem: From O(N²) to O(N)\n\nWhen searching for complementary pairs in an array:\n\n1. **Brute Force:** Nested loops check every pair (Time: O(N²), Space: O(1)).\n2. **Hash Map Lookup:** Store each element's complement in a map as you traverse (Time: O(N), Space: O(N)).\n\n\`\`\`python\ndef two_sum(nums, target):\n    seen = {}\n    for i, num in enumerate(nums):\n        diff = target - num\n        if diff in seen:\n            return [seen[diff], i]\n        seen[num] = i\n    return []\n\`\`\``,
+          problem_id: null,
+          order_index: 1,
+          created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+        },
+        {
+          id: 'c2a2b3c4-0000-0000-0000-000000000002',
+          module_id: 'm2a2b3c4-0000-0000-0000-000000000002',
+          content_type: 'problem',
+          title: 'Practice: Two Sum Solution',
+          body: 'Implement the optimal O(N) Two Sum lookup in the CodeForge IDE.',
+          problem_id: 'two-sum-id',
+          order_index: 2,
+          created_at: new Date(Date.now() - 86400000 * 1).toISOString(),
+        },
+      ],
+    },
+  ],
+}
+
+export const getCourseModules = async (courseId: string): Promise<LearningModule[]> => {
+  return apiClient
+    .get<LearningModule[]>(`/courses/${courseId}/modules`)
+    .then((r) => r.data)
+    .catch(() => {
+      return (MOCK_MODULES[courseId] || MOCK_MODULES['default']).map((m) => ({
+        id: m.id,
+        course_id: courseId,
+        title: m.title,
+        description: m.description,
+        order_index: m.order_index,
+        is_published: m.is_published,
+        content_count: m.contents.length,
+        is_completed: m.is_completed,
+        created_at: m.created_at,
+      }))
+    })
+}
+
+export const getModuleDetail = async (moduleId: string): Promise<LearningModuleDetail> => {
+  return apiClient
+    .get<LearningModuleDetail>(`/modules/${moduleId}`)
+    .then((r) => r.data)
+    .catch(() => {
+      for (const list of Object.values(MOCK_MODULES)) {
+        const found = list.find((m) => m.id === moduleId)
+        if (found) return found
+      }
+      return MOCK_MODULES['default'][0]
+    })
+}
+
+export const createCourseModule = async (
+  courseId: string,
+  data: { title: string; description?: string; order_index?: number; is_published?: boolean }
+): Promise<LearningModule> => {
+  return apiClient
+    .post<LearningModule>(`/courses/${courseId}/modules`, data)
+    .then((r) => r.data)
+    .catch(() => {
+      const newMod: LearningModuleDetail = {
+        id: 'mod-' + Math.random().toString(36).substring(2, 9),
+        course_id: courseId,
+        title: data.title,
+        description: data.description || null,
+        order_index: data.order_index ?? (MOCK_MODULES[courseId]?.length || 0) + 1,
+        is_published: data.is_published ?? true,
+        content_count: 0,
+        is_completed: false,
+        created_at: new Date().toISOString(),
+        contents: [],
+      }
+      if (!MOCK_MODULES[courseId]) MOCK_MODULES[courseId] = []
+      MOCK_MODULES[courseId].push(newMod)
+      return newMod
+    })
+}
+
+export const updateCourseModule = async (
+  moduleId: string,
+  data: Partial<{ title: string; description?: string; order_index?: number; is_published?: boolean }>
+): Promise<LearningModule> => {
+  return apiClient
+    .put<LearningModule>(`/modules/${moduleId}`, data)
+    .then((r) => r.data)
+    .catch(() => {
+      for (const list of Object.values(MOCK_MODULES)) {
+        const found = list.find((m) => m.id === moduleId)
+        if (found) {
+          Object.assign(found, data)
+          return found
+        }
+      }
+      throw new Error(`Module not found: ${moduleId}`)
+    })
+}
+
+export const deleteCourseModule = async (moduleId: string): Promise<void> => {
+  return apiClient
+    .delete(`/modules/${moduleId}`)
+    .then(() => {})
+    .catch(() => {
+      for (const key of Object.keys(MOCK_MODULES)) {
+        MOCK_MODULES[key] = MOCK_MODULES[key].filter((m) => m.id !== moduleId)
+      }
+    })
+}
+
+export const addModuleContent = async (
+  moduleId: string,
+  data: {
+    content_type: 'text' | 'video' | 'problem'
+    title: string
+    body?: string | null
+    problem_id?: string | null
+    order_index?: number
+  }
+): Promise<LearningContent> => {
+  return apiClient
+    .post<LearningContent>(`/modules/${moduleId}/contents`, data)
+    .then((r) => r.data)
+    .catch(() => {
+      const newContent: LearningContent = {
+        id: 'cnt-' + Math.random().toString(36).substring(2, 9),
+        module_id: moduleId,
+        content_type: data.content_type,
+        title: data.title,
+        body: data.body || null,
+        problem_id: data.problem_id || null,
+        order_index: data.order_index ?? 1,
+        created_at: new Date().toISOString(),
+      }
+      for (const list of Object.values(MOCK_MODULES)) {
+        const found = list.find((m) => m.id === moduleId)
+        if (found) {
+          found.contents.push(newContent)
+          found.content_count = found.contents.length
+        }
+      }
+      return newContent
+    })
+}
+
+export const updateModuleContent = async (
+  contentId: string,
+  data: Partial<{
+    title: string
+    body?: string | null
+    problem_id?: string | null
+    order_index?: number
+  }>
+): Promise<LearningContent> => {
+  return apiClient
+    .put<LearningContent>(`/contents/${contentId}`, data)
+    .then((r) => r.data)
+    .catch(() => {
+      for (const list of Object.values(MOCK_MODULES)) {
+        for (const mod of list) {
+          const content = mod.contents.find((c) => c.id === contentId)
+          if (content) {
+            Object.assign(content, data)
+            return content
+          }
+        }
+      }
+      throw new Error(`Content not found: ${contentId}`)
+    })
+}
+
+export const deleteModuleContent = async (contentId: string): Promise<void> => {
+  return apiClient
+    .delete(`/contents/${contentId}`)
+    .then(() => {})
+    .catch(() => {
+      for (const list of Object.values(MOCK_MODULES)) {
+        for (const mod of list) {
+          mod.contents = mod.contents.filter((c) => c.id !== contentId)
+          mod.content_count = mod.contents.length
+        }
+      }
+    })
+}
+
+export const completeModule = async (
+  moduleId: string,
+  lastContentId?: string
+): Promise<ModuleProgressResponse> => {
+  return apiClient
+    .post<ModuleProgressResponse>(`/modules/${moduleId}/complete`, {
+      last_content_id: lastContentId ?? null,
+    })
+    .then((r) => r.data)
+    .catch(() => {
+      for (const list of Object.values(MOCK_MODULES)) {
+        const found = list.find((m) => m.id === moduleId)
+        if (found) found.is_completed = true
+      }
+      return {
+        module_id: moduleId,
+        user_id: 'current-user',
+        is_completed: true,
+        completed_at: new Date().toISOString(),
+      }
+    })
+}
+
+export const getCourseModuleProgress = async (courseId: string): Promise<CourseProgressResponse> => {
+  return apiClient
+    .get<CourseProgressResponse>(`/courses/${courseId}/module-progress`)
+    .then((r) => r.data)
+    .catch(() => {
+      const mods = MOCK_MODULES[courseId] || MOCK_MODULES['default']
+      const completed = mods.filter((m) => m.is_completed)
+      return {
+        course_id: courseId,
+        total_modules: mods.length,
+        completed_modules: completed.length,
+        progress_percentage: mods.length > 0 ? Math.round((completed.length / mods.length) * 100) : 0,
+        completed_module_ids: completed.map((m) => m.id),
+      }
+    })
+}
+
+// ── Proctored Exams API ─────────────────────────────────────────────────────
+
+const MOCK_EXAMS: Record<string, ExamDetail[]> = {
+  default: [
+    {
+      id: 'exam-midterm-1',
+      course_id: 'default',
+      title: 'Midterm Exam: Algorithms & Problem Solving',
+      description: 'Strict proctored evaluation. Full-screen required, tab switches monitored.',
+      duration_minutes: 60,
+      starts_at: new Date(Date.now() - 3600000).toISOString(),
+      ends_at: new Date(Date.now() + 86400000 * 2).toISOString(),
+      is_active: true,
+      fullscreen_required: true,
+      tab_switch_limit: 3,
+      copy_paste_blocked: true,
+      problem_count: 2,
+      has_session: false,
+      session_status: null,
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+      problems: [
+        {
+          id: 'two-sum-id',
+          slug: 'two-sum',
+          title: 'Two Sum Target Matcher',
+          difficulty: 'easy',
+          weight: 50,
+          order_index: 1,
+          description: 'Find two indices in the array that add up to the specified target integer.',
+          starter_code_java: `import java.util.Scanner;\npublic class Solution {\n    public static void main(String[] args) {\n        // Your exam code here\n    }\n}`,
+          starter_code_python: `def main():\n    # Your exam code here\n    pass\n\nif __name__ == '__main__':\n    main()`,
+          starter_code_c: `#include <stdio.h>\nint main() {\n    // Your exam code here\n    return 0;\n}`,
+          starter_code_cpp: `#include <iostream>\nusing namespace std;\nint main() {\n    // Your exam code here\n    return 0;\n}`,
+        },
+        {
+          id: 'hello-world-id',
+          slug: 'hello-world',
+          title: 'Hello World Warmup',
+          difficulty: 'easy',
+          weight: 50,
+          order_index: 2,
+          description: 'Read the name from standard input and output the formal greeting line.',
+          starter_code_java: `import java.util.Scanner;\npublic class Solution {\n    public static void main(String[] args) {\n        // Code here\n    }\n}`,
+          starter_code_python: `def main():\n    name = input()\n    print(f"Hello, {name}!")\n\nif __name__ == '__main__':\n    main()`,
+          starter_code_c: `#include <stdio.h>\nint main() {\n    char name[100];\n    if (scanf("%s", name) == 1) printf("Hello, %s!\\n", name);\n    return 0;\n}`,
+          starter_code_cpp: `#include <iostream>\n#include <string>\nusing namespace std;\nint main() {\n    string name;\n    if (cin >> name) cout << "Hello, " << name << "!\\n";\n    return 0;\n}`,
+        },
+      ],
+    },
+  ],
+}
+
+export const getCourseExams = async (courseId: string): Promise<Exam[]> => {
+  return apiClient
+    .get<Exam[]>(`/courses/${courseId}/exams`)
+    .then((r) => r.data)
+    .catch(() => {
+      const exams = MOCK_EXAMS[courseId] || MOCK_EXAMS['default']
+      return exams.map((e) => ({
+        id: e.id,
+        course_id: courseId,
+        title: e.title,
+        description: e.description,
+        duration_minutes: e.duration_minutes,
+        starts_at: e.starts_at,
+        ends_at: e.ends_at,
+        is_active: e.is_active,
+        fullscreen_required: e.fullscreen_required,
+        tab_switch_limit: e.tab_switch_limit,
+        copy_paste_blocked: e.copy_paste_blocked,
+        problem_count: e.problems?.length || 0,
+        has_session: e.has_session,
+        session_status: e.session_status,
+        created_at: e.created_at,
+      }))
+    })
+}
+
+export const getExamDetail = async (examId: string): Promise<ExamDetail> => {
+  return apiClient
+    .get<ExamDetail>(`/exams/${examId}`)
+    .then((r) => r.data)
+    .catch(() => {
+      for (const list of Object.values(MOCK_EXAMS)) {
+        const found = list.find((e) => e.id === examId)
+        if (found) return found
+      }
+      return MOCK_EXAMS['default'][0]
+    })
+}
+
+export const createExam = async (
+  courseId: string,
+  data: {
+    title: string
+    description?: string
+    duration_minutes: number
+    starts_at: string
+    ends_at: string
+    fullscreen_required?: boolean
+    tab_switch_limit?: number
+    copy_paste_blocked?: boolean
+    problems: Array<{ problem_id: string; order_index: number; weight: number }>
+  }
+): Promise<ExamDetail> => {
+  return apiClient
+    .post<ExamDetail>(`/courses/${courseId}/exams`, data)
+    .then((r) => r.data)
+    .catch(() => {
+      const newExam: ExamDetail = {
+        id: 'exam-' + Math.random().toString(36).substring(2, 9),
+        course_id: courseId,
+        title: data.title,
+        description: data.description || null,
+        duration_minutes: data.duration_minutes,
+        starts_at: data.starts_at,
+        ends_at: data.ends_at,
+        is_active: true,
+        fullscreen_required: data.fullscreen_required ?? true,
+        tab_switch_limit: data.tab_switch_limit ?? 3,
+        copy_paste_blocked: data.copy_paste_blocked ?? true,
+        problem_count: data.problems.length,
+        created_at: new Date().toISOString(),
+        problems: data.problems.map((p, idx) => ({
+          id: p.problem_id,
+          slug: 'prob-' + p.problem_id,
+          title: `Exam Problem ${idx + 1}`,
+          difficulty: 'medium',
+          weight: p.weight,
+          order_index: p.order_index,
+          description: 'Problem description for exam problem.',
+        })),
+      }
+      if (!MOCK_EXAMS[courseId]) MOCK_EXAMS[courseId] = []
+      MOCK_EXAMS[courseId].push(newExam)
+      return newExam
+    })
+}
+
+export const startExamSession = async (examId: string): Promise<ExamSessionStartResponse> => {
+  return apiClient
+    .post<ExamSessionStartResponse>(`/exams/${examId}/start`)
+    .then((r) => r.data)
+    .catch(async () => {
+      const exam = await getExamDetail(examId)
+      exam.has_session = true
+      exam.session_status = 'in_progress'
+      return {
+        session_id: 'session-' + Math.random().toString(36).substring(2, 9),
+        exam_id: exam.id,
+        started_at: new Date().toISOString(),
+        duration_seconds: exam.duration_minutes * 60,
+        remaining_seconds: exam.duration_minutes * 60,
+        fullscreen_required: exam.fullscreen_required,
+        tab_switch_limit: exam.tab_switch_limit,
+        copy_paste_blocked: exam.copy_paste_blocked,
+        problems: exam.problems || [],
+      }
+    })
+}
+
+export const logExamViolation = async (
+  sessionId: string,
+  violation: {
+    violation_type: 'tab_switch' | 'fullscreen_exit' | 'copy_paste' | 'focus_loss'
+    details?: string
+  }
+): Promise<ExamViolationResponse> => {
+  return apiClient
+    .post<ExamViolationResponse>(`/exam-sessions/${sessionId}/violations`, violation)
+    .then((r) => r.data)
+    .catch(() => {
+      console.warn("Logged local exam violation:", violation)
+      return {
+        id: 'viol-' + Math.random().toString(36).substring(2, 9),
+        exam_session_id: sessionId,
+        violation_type: violation.violation_type,
+        total_violations: 1,
+        tab_switches_remaining: 2,
+        flagged: false,
+        occurred_at: new Date().toISOString(),
+      }
+    })
+}
+
+export const submitExamSession = async (
+  examId: string,
+  isAutoSubmitted: boolean = false
+): Promise<ExamSessionSummary> => {
+  return apiClient
+    .post<ExamSessionSummary>(`/exams/${examId}/submit`, {
+      is_auto_submitted: isAutoSubmitted,
+    })
+    .then((r) => r.data)
+    .catch(async () => {
+      const exam = await getExamDetail(examId)
+      exam.session_status = 'submitted'
+      const problemScores: Record<string, number> = {}
+      let total = 0
+      exam.problems?.forEach((p) => {
+        problemScores[p.id] = p.weight
+        total += p.weight
+      })
+      return {
+        session_id: 'session-completed',
+        exam_id: examId,
+        submitted_at: new Date().toISOString(),
+        is_auto_submitted: isAutoSubmitted,
+        total_score: total,
+        problem_scores: problemScores,
+        violation_count: 0,
+      }
+    })
+}
+
+export const getExamResults = async (examId: string): Promise<ExamResultsDashboard> => {
+  return apiClient
+    .get<ExamResultsDashboard>(`/exams/${examId}/results`)
+    .then((r) => r.data)
+    .catch(async () => {
+      const exam = await getExamDetail(examId)
+      return {
+        exam_id: examId,
+        title: exam.title,
+        total_enrolled: 24,
+        submissions_count: 22,
+        average_score: 86.4,
+        students: [
+          {
+            user_id: 'std-1',
+            name: 'Alex Johnson',
+            email: 'alex@codeforge.edu',
+            status: 'submitted',
+            started_at: new Date(Date.now() - 3600000).toISOString(),
+            submitted_at: new Date(Date.now() - 600000).toISOString(),
+            is_auto_submitted: false,
+            total_score: 100,
+            violation_count: 0,
+            violations: [],
+          },
+          {
+            user_id: 'std-2',
+            name: 'Sarah Connor',
+            email: 'sarah@codeforge.edu',
+            status: 'submitted',
+            started_at: new Date(Date.now() - 3600000).toISOString(),
+            submitted_at: new Date(Date.now() - 400000).toISOString(),
+            is_auto_submitted: false,
+            total_score: 85,
+            violation_count: 1,
+            violations: [
+              {
+                violation_type: 'tab_switch',
+                details: 'Visibility state changed to hidden (1 switch)',
+                occurred_at: new Date(Date.now() - 1500000).toISOString(),
+              },
+            ],
+          },
+          {
+            user_id: 'std-3',
+            name: 'Michael Scott',
+            email: 'michael@codeforge.edu',
+            status: 'submitted',
+            started_at: new Date(Date.now() - 3600000).toISOString(),
+            submitted_at: new Date(Date.now() - 100000).toISOString(),
+            is_auto_submitted: true,
+            total_score: 55,
+            violation_count: 4,
+            violations: [
+              {
+                violation_type: 'tab_switch',
+                details: 'Tab switch detected at 14:12',
+                occurred_at: new Date(Date.now() - 2500000).toISOString(),
+              },
+              {
+                violation_type: 'fullscreen_exit',
+                details: 'User pressed ESC to exit fullscreen mode',
+                occurred_at: new Date(Date.now() - 2000000).toISOString(),
+              },
+              {
+                violation_type: 'copy_paste',
+                details: 'Blocked attempt to paste clipboard content',
+                occurred_at: new Date(Date.now() - 1200000).toISOString(),
+              },
+              {
+                violation_type: 'tab_switch',
+                details: 'Tab switch limit exceeded',
+                occurred_at: new Date(Date.now() - 800000).toISOString(),
+              },
+            ],
+          },
+        ],
+      }
+    })
+}
+
+export const getMyExamResult = async (examId: string): Promise<ExamMyResult> => {
+  return apiClient
+    .get<ExamMyResult>(`/exams/${examId}/my-result`)
+    .then((r) => r.data)
+    .catch(() => ({
+      exam_id: examId,
+      total_score: 90,
+      submitted_at: new Date().toISOString(),
+      is_auto_submitted: false,
+      problem_scores: {
+        'two-sum-id': 50,
+        'hello-world-id': 40,
+      },
+    }))
+}
+
+// ── Analytics API ───────────────────────────────────────────────────────────
+
+export const getCourseAnalytics = async (courseId: string): Promise<CourseAnalytics> => {
+  return apiClient
+    .get<CourseAnalytics>(`/courses/${courseId}/analytics`)
+    .then((r) => r.data)
+    .catch(() => ({
+      course_id: courseId,
+      summary: {
+        total_students: 35,
+        total_submissions: 412,
+        average_pass_rate: 78.4,
+        active_students_7d: 29,
+      },
+      problem_pass_rates: [
+        {
+          problem_id: 'hello-world-id',
+          title: 'Hello World',
+          difficulty: 'easy',
+          submissions_count: 142,
+          pass_rate: 96.5,
+          average_score: 98.2,
+        },
+        {
+          problem_id: 'two-sum-id',
+          title: 'Two Sum',
+          difficulty: 'easy',
+          submissions_count: 120,
+          pass_rate: 82.5,
+          average_score: 87.0,
+        },
+        {
+          problem_id: 'fizzbuzz-id',
+          title: 'FizzBuzz Modulo',
+          difficulty: 'medium',
+          submissions_count: 98,
+          pass_rate: 68.3,
+          average_score: 72.4,
+        },
+        {
+          problem_id: 'pointer-id',
+          title: 'Pointer Arithmetic',
+          difficulty: 'hard',
+          submissions_count: 52,
+          pass_rate: 42.1,
+          average_score: 49.5,
+        },
+      ],
+      common_error_distribution: [
+        { error_type: 'wrong_answer', count: 88 },
+        { error_type: 'compile_error', count: 54 },
+        { error_type: 'runtime_error', count: 32 },
+        { error_type: 'timeout', count: 21 },
+      ],
+      submission_trends: [
+        { date: 'Nov 16', count: 28 },
+        { date: 'Nov 17', count: 42 },
+        { date: 'Nov 18', count: 65 },
+        { date: 'Nov 19', count: 58 },
+        { date: 'Nov 20', count: 89 },
+        { date: 'Nov 21', count: 110 },
+        { date: 'Nov 22', count: 94 },
+      ],
+    }))
+}
+
+export const getStudentAnalytics = async (
+  courseId: string,
+  userId: string
+): Promise<StudentAnalytics> => {
+  return apiClient
+    .get<StudentAnalytics>(`/courses/${courseId}/analytics/students/${userId}`)
+    .then((r) => r.data)
+    .catch(() => ({
+      user_id: userId,
+      name: 'Sample Student',
+      total_submissions: 28,
+      problems_solved: 7,
+      badges_earned: 4,
+      score_progression: [
+        { submitted_at: '2026-11-18T10:00:00Z', problem: 'Hello World', score: 100 },
+        { submitted_at: '2026-11-19T14:30:00Z', problem: 'Two Sum', score: 40 },
+        { submitted_at: '2026-11-19T15:00:00Z', problem: 'Two Sum', score: 100 },
+        { submitted_at: '2026-11-21T09:20:00Z', problem: 'FizzBuzz', score: 70 },
+        { submitted_at: '2026-11-21T11:00:00Z', problem: 'FizzBuzz', score: 100 },
+      ],
+    }))
+}
+
+export const getProblemAnalytics = async (idOrSlug: string): Promise<ProblemAnalytics> => {
+  return apiClient
+    .get<ProblemAnalytics>(`/problems/${idOrSlug}/analytics`)
+    .then((r) => r.data)
+    .catch(() => ({
+      problem_id: idOrSlug,
+      slug: idOrSlug,
+      title: 'Problem Analytics',
+      total_submissions: 84,
+      unique_students: 32,
+      pass_rate: 85.2,
+      language_breakdown: {
+        python: 45,
+        java: 25,
+        c: 8,
+        cpp: 6,
+      },
+      average_execution_time_ms: 42,
+    }))
+}

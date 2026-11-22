@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import {
   getProblem,
@@ -8,17 +8,19 @@ import {
   getSubmission,
   getSubmissionHistory,
   getLabSession,
+  runCustomInput,
   ProblemDetail,
   Submission,
   SubmissionSummary,
   LabSessionDetail,
   Language,
+  RunCustomResponse,
 } from '../api/client'
 import ProblemDescription from '../components/ProblemDescription'
-import CodeEditor from '../components/CodeEditor'
+import CodeEditor, { KeybindingMode } from '../components/CodeEditor'
 import TestCasePanel from '../components/TestCasePanel'
-import { useTheme } from '../context/ThemeContext'
-import { useAuth } from '../context/AuthContext'
+import Navbar from '../components/Navbar'
+import { useWebSocket } from '../hooks/useWebSocket'
 
 // ── Badge Toast ───────────────────────────────────────────────────────────────
 
@@ -116,21 +118,35 @@ export default function ProblemPage() {
   const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
   const labId = searchParams.get('lab')
-  const navigate = useNavigate()
+
   const [problem, setProblem] = useState<ProblemDetail | null>(null)
   const [code, setCode] = useState<string>('')
-  const [language, setLanguage] = useState<Language>('java')
-  const [submission, setSubmission] = useState<Submission | null>(null)
+  const [language, setLanguage] = useState<Language>('python')
+  const [keybindingMode, setKeybindingMode] = useState<KeybindingMode>('vscode')
+  const [draftSaved, setDraftSaved] = useState<boolean>(false)
+
   const [history, setHistory] = useState<SubmissionSummary[]>([])
-  const [loading, setLoading] = useState<boolean>(false)
+  const [pageLoading, setPageLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [rightTab, setRightTab] = useState<RightTab>('editor')
   const [badgeToast, setBadgeToast] = useState<{ count: number } | null>(null)
   const [labSession, setLabSession] = useState<LabSessionDetail | null>(null)
   const [labTimeLeft, setLabTimeLeft] = useState<string>('')
-  const pollIntervalRef = useRef<number | null>(null)
-  const { theme, toggleTheme } = useTheme()
-  const { user, logout } = useAuth()
+
+  // Custom Input State
+  const [customRunning, setCustomRunning] = useState<boolean>(false)
+  const [customResult, setCustomResult] = useState<RunCustomResponse | null>(null)
+
+  // Real-Time WebSocket Hook
+  const {
+    submission: wsSubmission,
+    loading: wsLoading,
+    progress: liveProgress,
+    startTracking,
+  } = useWebSocket()
+
+  const [selectedHistoricalSub, setSelectedHistoricalSub] = useState<Submission | null>(null)
+  const currentSubmission = selectedHistoricalSub || wsSubmission
 
   // Load lab session if labId is present
   useEffect(() => {
@@ -158,26 +174,59 @@ export default function ProblemPage() {
     return () => clearInterval(iv)
   }, [labSession])
 
+  // Helper to get default starter code for language
+  const getStarterCode = useCallback((prob: ProblemDetail, lang: Language): string => {
+    switch (lang) {
+      case 'python':
+        return prob.starter_code_python ?? `import sys\n\ndef main():\n    # Your solution here\n    pass\n\nif __name__ == '__main__':\n    main()`
+      case 'c':
+        return prob.starter_code_c ?? `#include <stdio.h>\n\nint main() {\n    // Your solution here\n    return 0;\n}`
+      case 'cpp':
+        return prob.starter_code_cpp ?? `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your solution here\n    return 0;\n}`
+      case 'java':
+      default:
+        return prob.starter_code_java ?? `import java.util.Scanner;\n\npublic class Solution {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        // Your code here\n    }\n}`
+    }
+  }, [])
+
   // Load problem on mount
   useEffect(() => {
     if (!slug) return
-    setLoading(true)
+    setPageLoading(true)
     getProblem(slug)
       .then((data) => {
         setProblem(data)
-        setCode(data.starter_code_java)
-        setLoading(false)
+        // Check for saved draft
+        const draftKey = `cf_draft_${slug}_${language}`
+        const savedDraft = localStorage.getItem(draftKey)
+        if (savedDraft) {
+          setCode(savedDraft)
+          setDraftSaved(true)
+        } else {
+          setCode(getStarterCode(data, language))
+        }
+        setPageLoading(false)
       })
       .catch((err) => {
         console.error(err)
-        setError('Failed to load problem details. Please check the backend connection.')
-        setLoading(false)
+        setError('Failed to load problem details. Please check connection.')
+        setPageLoading(false)
       })
+  }, [slug, language, getStarterCode])
 
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-    }
-  }, [slug])
+  // Auto-save draft on code changes (debounced)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleCodeChange = (newCode: string) => {
+    setCode(newCode)
+    setDraftSaved(false)
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => {
+      if (slug) {
+        localStorage.setItem(`cf_draft_${slug}_${language}`, newCode)
+        setDraftSaved(true)
+      }
+    }, 600)
+  }
 
   // Refresh submission history whenever a submission completes
   const refreshHistory = useCallback(() => {
@@ -185,86 +234,80 @@ export default function ProblemPage() {
     getSubmissionHistory(slug).then(setHistory).catch(() => {})
   }, [slug])
 
-  // Update starter code when language changes
-  useEffect(() => {
+  // Handle language switch
+  const handleLanguageChange = (newLang: Language) => {
+    if (newLang === language) return
+    setLanguage(newLang)
     if (!problem) return
-    if (language === 'python') {
-      setCode(problem.starter_code_python ?? '# Your solution here\n')
+    const draftKey = `cf_draft_${slug}_${newLang}`
+    const savedDraft = localStorage.getItem(draftKey)
+    if (savedDraft) {
+      setCode(savedDraft)
+      setDraftSaved(true)
     } else {
-      setCode(problem.starter_code_java)
+      setCode(getStarterCode(problem, newLang))
+      setDraftSaved(false)
     }
-  }, [language, problem])
-
-  const startPolling = (submissionId: string, isSubmit: boolean) => {
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-    setLoading(true)
-    pollIntervalRef.current = window.setInterval(() => {
-      getSubmission(submissionId)
-        .then((sub) => {
-          setSubmission(sub)
-          if (sub.status !== 'queued' && sub.status !== 'running') {
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current)
-              pollIntervalRef.current = null
-            }
-            setLoading(false)
-
-            // Mark as solved in localStorage
-            if (isSubmit && sub.status === 'completed' && sub.score === 100) {
-              localStorage.setItem(`solved_${slug}`, 'true')
-            }
-
-            // Show badge toast
-            if (sub.badge_awarded && sub.new_badge_count !== null) {
-              setBadgeToast({ count: sub.new_badge_count })
-            }
-
-            refreshHistory()
-          }
-        })
-        .catch((err) => {
-          console.error(err)
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current)
-            pollIntervalRef.current = null
-          }
-          setLoading(false)
-        })
-    }, 1000)
   }
 
+  // Check badges when wsSubmission completes
+  useEffect(() => {
+    if (wsSubmission?.status === 'completed') {
+      if (wsSubmission.score === 100 && slug) {
+        localStorage.setItem(`solved_${slug}`, 'true')
+      }
+      if (wsSubmission.badge_awarded && wsSubmission.new_badge_count !== null) {
+        setBadgeToast({ count: wsSubmission.new_badge_count })
+      }
+      refreshHistory()
+    }
+  }, [wsSubmission, slug, refreshHistory])
+
+  // Execution triggers using WebSocket
   const handleRun = () => {
     if (!slug || !code) return
-    setSubmission(null)
-    setLoading(true)
+    setSelectedHistoricalSub(null)
     runCode(slug, code, language)
-      .then((res) => startPolling(res.submission_id, false))
-      .catch((err) => { console.error(err); setLoading(false) })
+      .then((res) => startTracking(res.submission_id))
+      .catch((err) => console.error(err))
   }
 
   const handleSubmit = () => {
     if (!slug || !code) return
-    setSubmission(null)
-    setLoading(true)
+    setSelectedHistoricalSub(null)
     submitCode(slug, code, language, labId ?? undefined)
-      .then((res) => startPolling(res.submission_id, true))
-      .catch((err) => { console.error(err); setLoading(false) })
+      .then((res) => startTracking(res.submission_id))
+      .catch((err) => console.error(err))
+  }
+
+  const handleCustomInputRun = async (stdin: string) => {
+    if (!slug || !code) return
+    setCustomRunning(true)
+    setCustomResult(null)
+    try {
+      const res = await runCustomInput(slug, code, language, stdin)
+      setCustomResult(res)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setCustomRunning(false)
+    }
   }
 
   const handleHistorySelect = (id: string) => {
-    setLoading(true)
     getSubmission(id)
       .then((sub) => {
-        setSubmission(sub)
+        setSelectedHistoricalSub(sub)
         setRightTab('editor')
-        setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {})
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const filenameMap: Record<Language, string> = {
+    java: 'Solution.java',
+    python: 'solution.py',
+    c: 'solution.c',
+    cpp: 'solution.cpp',
   }
 
   return (
@@ -291,64 +334,17 @@ export default function ProblemPage() {
       )}
 
       {/* Header */}
-      <header className="h-14 border-b border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-950 flex items-center justify-between px-6 shrink-0 transition-colors">
-        <div className="flex items-center gap-4">
-          <Link
-            to={labId ? `/labs/${labId}` : "/"}
-            className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white transition-colors text-xs font-semibold uppercase tracking-wider"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            {labId ? 'Back to Lab' : 'Problems'}
-          </Link>
-          <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
-          <span className="font-bold text-sm tracking-tight text-zinc-900 dark:text-white">{problem?.title || 'Loading...'}</span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* User chip */}
-          {user && (
-            <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-              <div className="w-6 h-6 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center font-bold text-orange-600 dark:text-orange-400 text-[10px]">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <span>{user.name}</span>
-            </div>
-          )}
-
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-805 transition-colors"
-            aria-label="Toggle Theme"
-          >
-            {theme === 'dark' ? (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-            )}
-          </button>
-
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors font-medium"
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
+      <Navbar
+        customTitle={problem?.title || 'Loading...'}
+        backTo={labId ? `/labs/${labId}` : "/"}
+        backLabel={labId ? 'Back to Lab' : 'Problems'}
+      />
 
       {/* Split Pane Workspace */}
       <div className="flex-1 min-h-0 relative bg-zinc-50 dark:bg-zinc-950">
         {error ? (
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-            <div className="max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 flex flex-col gap-4 shadow-md dark:shadow-none">
+            <div className="max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 flex flex-col gap-4 shadow-md">
               <h2 className="text-red-500 dark:text-red-400 font-bold text-lg">Error</h2>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm">{error}</p>
               <Link
@@ -359,7 +355,7 @@ export default function ProblemPage() {
               </Link>
             </div>
           </div>
-        ) : !problem ? (
+        ) : !problem || pageLoading ? (
           <div className="absolute inset-0 flex items-center justify-center gap-3">
             <div className="w-8 h-8 rounded-full border-4 border-orange-500/10 border-t-orange-500 animate-spin" />
             <span className="text-zinc-500 text-sm font-medium">Loading workspace…</span>
@@ -385,10 +381,18 @@ export default function ProblemPage() {
                 <Panel defaultSize={60} minSize={30} className="flex flex-col bg-white dark:bg-zinc-950">
                   {/* Editor Header Toolbar */}
                   <div className="h-10 bg-zinc-50 dark:bg-zinc-900/40 border-b border-zinc-200 dark:border-zinc-900 flex items-center justify-between px-4 shrink-0 gap-3">
-                    {/* File name */}
-                    <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-mono shrink-0">
-                      {language === 'java' ? 'Solution.java' : 'solution.py'}
-                    </span>
+                    {/* File name & Auto-save pill */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-mono">
+                        {filenameMap[language]}
+                      </span>
+                      {draftSaved && (
+                        <span className="text-[10px] text-green-500 flex items-center gap-1 font-sans">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                          Saved
+                        </span>
+                      )}
+                    </div>
 
                     {/* Tabs: Editor / History */}
                     <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-md p-0.5 gap-0.5">
@@ -410,28 +414,48 @@ export default function ProblemPage() {
                       ))}
                     </div>
 
-                    {/* Language selector */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {(['java', 'python'] as Language[]).map((lang) => (
-                        <button
-                          key={lang}
-                          onClick={() => setLanguage(lang)}
-                          className={`text-[10px] px-2 py-0.5 rounded font-mono border transition-all uppercase ${
-                            language === lang
-                              ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/25'
-                              : 'text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
-                          }`}
-                        >
-                          {lang === 'java' ? 'Java 21' : 'Python 3'}
-                        </button>
-                      ))}
+                    {/* Keybinding Selector & Language selector */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Keybindings */}
+                      <select
+                        value={keybindingMode}
+                        onChange={(e) => setKeybindingMode(e.target.value as KeybindingMode)}
+                        aria-label="Editor Keybindings"
+                        className="text-[10px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded px-1.5 py-0.5 text-zinc-600 dark:text-zinc-300 focus:outline-none"
+                      >
+                        <option value="vscode">VS Code</option>
+                        <option value="vim">Vim</option>
+                        <option value="emacs">Emacs</option>
+                      </select>
+
+                      {/* Languages: Java, Python, C, C++ */}
+                      <div className="flex items-center gap-1">
+                        {(['python', 'java', 'c', 'cpp'] as Language[]).map((lang) => (
+                          <button
+                            key={lang}
+                            onClick={() => handleLanguageChange(lang)}
+                            className={`text-[10px] px-2 py-0.5 rounded font-mono border transition-all uppercase ${
+                              language === lang
+                                ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 font-bold'
+                                : 'text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400'
+                            }`}
+                          >
+                            {lang === 'cpp' ? 'C++' : lang}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
                   {/* Editor or History */}
                   <div className="flex-1 min-h-0 relative">
                     {rightTab === 'editor' ? (
-                      <CodeEditor value={code} onChange={setCode} language={language === 'java' ? 'java' : 'python'} />
+                      <CodeEditor
+                        value={code}
+                        onChange={handleCodeChange}
+                        language={language}
+                        keybindingMode={keybindingMode}
+                      />
                     ) : (
                       <div className="absolute inset-0 bg-white dark:bg-zinc-950">
                         <HistoryPanel history={history} onSelect={handleHistorySelect} />
@@ -440,39 +464,50 @@ export default function ProblemPage() {
                   </div>
 
                   {/* Action Buttons Toolbar at bottom of Editor */}
-                  <div className="h-14 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/60 px-4 flex items-center justify-end gap-3 shrink-0">
-                    <button
-                      onClick={handleRun}
-                      disabled={loading}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 border border-zinc-300 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:border-zinc-450 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white rounded text-xs font-semibold tracking-wider uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      Run
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={loading}
-                      className="inline-flex items-center gap-1.5 px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-semibold tracking-wider uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/5 hover:shadow-orange-500/10"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Submit
-                    </button>
+                  <div className="h-14 border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-950/60 px-4 flex items-center justify-between shrink-0">
+                    <div className="text-[11px] text-zinc-400 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      <span>Ready in Docker Sandbox ({language.toUpperCase()})</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleRun}
+                        disabled={wsLoading}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 border border-zinc-300 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white rounded text-xs font-semibold tracking-wider uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Run
+                      </button>
+                      <button
+                        onClick={handleSubmit}
+                        disabled={wsLoading}
+                        className="inline-flex items-center gap-1.5 px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded text-xs font-semibold tracking-wider uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-orange-500/10"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Submit
+                      </button>
+                    </div>
                   </div>
                 </Panel>
 
                 {/* Resize handle horizontal */}
                 <PanelResizeHandle className="h-1.5 hover:h-2 bg-zinc-200 dark:bg-zinc-900 hover:bg-orange-500/40 active:bg-orange-500 transition-all cursor-row-resize shrink-0" />
 
-                {/* Test Results Pane */}
+                {/* Test Results & Custom Input Pane */}
                 <Panel defaultSize={40} minSize={20} className="bg-white dark:bg-zinc-950">
                   <TestCasePanel
-                    submission={submission}
-                    loading={loading && !!pollIntervalRef.current}
+                    submission={currentSubmission}
+                    loading={wsLoading}
                     testCases={problem.test_cases}
+                    liveProgress={liveProgress}
+                    onRunCustomInput={handleCustomInputRun}
+                    customRunning={customRunning}
+                    customResult={customResult}
                   />
                 </Panel>
               </PanelGroup>

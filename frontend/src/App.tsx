@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 
-// Pages
+// Core Pages
 import LoginPage from './pages/LoginPage'
 import CourseListPage from './pages/CourseListPage'
 import CoursePage from './pages/CoursePage'
@@ -12,6 +12,16 @@ import LabCreatePage from './pages/LabCreatePage'
 import LabDashboardPage from './pages/LabDashboardPage'
 import StudentLabPage from './pages/StudentLabPage'
 import GradebookPage from './pages/GradebookPage'
+
+// Final Jury Pages (Learning, Proctored Exams, Analytics)
+import LearnPage from './pages/LearnPage'
+import ModulePage from './pages/ModulePage'
+import ModuleCreatePage from './pages/ModuleCreatePage'
+import ExamCreatePage from './pages/ExamCreatePage'
+import ExamPage from './pages/ExamPage'
+import ExamResultsPage from './pages/ExamResultsPage'
+import ExamMyResultPage from './pages/ExamMyResultPage'
+import AnalyticsPage from './pages/AnalyticsPage'
 
 /**
  * Redirects unauthenticated users to /login, preserving the
@@ -39,17 +49,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 /**
  * Root router.
- *
- * Routes:
- *   /login                      → LoginPage (public)
- *   /                           → CourseListPage — course dashboard (protected)
- *   /practice                   → ProblemListPage — standalone practice (protected)
- *   /courses/:id                → CoursePage — course detail with tabs (protected)
- *   /courses/:courseId/labs/create → LabCreatePage — create lab session (instructor)
- *   /courses/:courseId/gradebook  → GradebookPage — gradebook table (instructor)
- *   /labs/:id                   → StudentLabPage — student lab mode (protected)
- *   /labs/:id/dashboard         → LabDashboardPage — instructor dashboard (protected)
- *   /problems/:slug             → ProblemPage — Monaco editor + results (protected)
  */
 export default function App() {
   return (
@@ -68,6 +67,20 @@ export default function App() {
 
             {/* Protected — Course Detail */}
             <Route path="/courses/:id" element={<ProtectedRoute><CoursePage /></ProtectedRoute>} />
+
+            {/* Protected — Learning Modules */}
+            <Route path="/courses/:courseId/learn" element={<ProtectedRoute><LearnPage /></ProtectedRoute>} />
+            <Route path="/modules/:id" element={<ProtectedRoute><ModulePage /></ProtectedRoute>} />
+            <Route path="/courses/:courseId/modules/create" element={<ProtectedRoute><ModuleCreatePage /></ProtectedRoute>} />
+
+            {/* Protected — Proctored Assessments */}
+            <Route path="/courses/:courseId/exams/create" element={<ProtectedRoute><ExamCreatePage /></ProtectedRoute>} />
+            <Route path="/exams/:id" element={<ProtectedRoute><ExamPage /></ProtectedRoute>} />
+            <Route path="/exams/:id/results" element={<ProtectedRoute><ExamResultsPage /></ProtectedRoute>} />
+            <Route path="/exams/:id/my-result" element={<ProtectedRoute><ExamMyResultPage /></ProtectedRoute>} />
+
+            {/* Protected — Course Analytics */}
+            <Route path="/courses/:courseId/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
 
             {/* Protected — Lab Session Create (Instructor) */}
             <Route path="/courses/:courseId/labs/create" element={<ProtectedRoute><LabCreatePage /></ProtectedRoute>} />

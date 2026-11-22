@@ -1,17 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { getLabSession, getLabDashboard, LabSessionDetail, StudentLabProgress } from '../api/client'
-import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
+import Navbar from '../components/Navbar'
 
 type SortKey = 'name' | 'mandatory' | 'badges' | 'last_submission'
 type SortDir = 'asc' | 'desc'
 
 export default function LabDashboardPage() {
   const { id } = useParams<{ id: string }>()
-  const { user, logout } = useAuth()
-  const { theme, toggleTheme } = useTheme()
-  const navigate = useNavigate()
 
   const [lab, setLab] = useState<LabSessionDetail | null>(null)
   const [students, setStudents] = useState<StudentLabProgress[]>([])
@@ -83,31 +79,11 @@ export default function LabDashboardPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col transition-colors duration-200">
       {/* Header */}
-      <header className="border-b border-zinc-200 dark:border-zinc-900 bg-white/80 dark:bg-zinc-900/20 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to={lab ? `/courses/${lab.course_id}` : '/'} className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 hover:text-orange-500 text-xs font-semibold uppercase tracking-wider transition-colors">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            Course
-          </Link>
-          <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
-          <span className="font-bold text-sm text-zinc-900 dark:text-white tracking-tight">{lab?.title ?? 'Lab Dashboard'}</span>
-          {lab?.is_active && <span className="px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 text-[10px] font-bold border border-green-500/20">LIVE</span>}
-        </div>
-        <div className="flex items-center gap-3">
-          {user && (
-            <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-              <div className="w-6 h-6 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center font-bold text-orange-600 dark:text-orange-400 text-[10px]">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <span>{user.name}</span>
-            </div>
-          )}
-          <button onClick={toggleTheme} className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 transition-colors">
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
-          <button onClick={() => { logout(); navigate('/login') }} className="text-xs text-zinc-500 hover:text-red-500 font-medium transition-colors">Sign out</button>
-        </div>
-      </header>
+      <Navbar
+        customTitle={lab?.title ? `${lab.title} (Live Dashboard)` : 'Lab Dashboard'}
+        backTo={lab ? `/courses/${lab.course_id}` : '/'}
+        backLabel="Course"
+      />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
         {/* Summary cards */}

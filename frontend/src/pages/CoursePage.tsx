@@ -1,31 +1,35 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
   getCourse,
   getCourseProblems,
   getCourseLabs,
+  getCourseModules,
+  getCourseExams,
   createProblem,
   bulkImportProblems,
   CourseResponse,
   ProblemSummary,
   LabSession,
+  LearningModule,
+  Exam,
   ProblemCreateInput,
   TestCaseInput,
 } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
+import Navbar from '../components/Navbar'
 
-type Tab = 'problems' | 'labs' | 'gradebook'
+type Tab = 'problems' | 'learn' | 'labs' | 'exams' | 'gradebook' | 'analytics'
 
 export default function CoursePage() {
   const { id } = useParams<{ id: string }>()
-  const { user, logout } = useAuth()
-  const { theme, toggleTheme } = useTheme()
-  const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [course, setCourse] = useState<CourseResponse | null>(null)
   const [problems, setProblems] = useState<ProblemSummary[]>([])
   const [labs, setLabs] = useState<LabSession[]>([])
+  const [modules, setModules] = useState<LearningModule[]>([])
+  const [exams, setExams] = useState<Exam[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('problems')
   const [showCode, setShowCode] = useState(false)
@@ -63,8 +67,20 @@ export default function CoursePage() {
 
   useEffect(() => {
     if (!id) return
-    Promise.all([getCourse(id), getCourseProblems(id), getCourseLabs(id)])
-      .then(([c, p, l]) => { setCourse(c); setProblems(p); setLabs(l) })
+    Promise.all([
+      getCourse(id),
+      getCourseProblems(id),
+      getCourseLabs(id),
+      getCourseModules(id).catch(() => []),
+      getCourseExams(id).catch(() => []),
+    ])
+      .then(([c, p, l, m, e]) => {
+        setCourse(c)
+        setProblems(p)
+        setLabs(l)
+        setModules(m)
+        setExams(e)
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [id])
@@ -223,27 +239,7 @@ export default function CoursePage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col transition-colors duration-200">
-      {/* Header */}
-      <header className="border-b border-zinc-200 dark:border-zinc-900 bg-white/80 dark:bg-zinc-900/20 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between transition-colors">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 hover:text-orange-500 dark:hover:text-orange-400 text-xs font-semibold uppercase tracking-wider transition-colors">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            Courses
-          </Link>
-          <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800" />
-          <span className="font-bold text-sm text-zinc-900 dark:text-white tracking-tight">{course.title}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={toggleTheme} className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 transition-colors">
-            {theme === 'dark' ? (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z" /></svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-            )}
-          </button>
-          <button onClick={() => { logout(); navigate('/login') }} className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors font-medium">Sign out</button>
-        </div>
-      </header>
+      <Navbar customTitle={course.title} backTo="/" backLabel="Courses" />
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
         {/* Course header card */}
@@ -294,18 +290,32 @@ export default function CoursePage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg p-1 self-start border border-zinc-200 dark:border-zinc-800">
-          {(['problems', 'labs', ...(isInstructor ? ['gradebook'] : [])] as Tab[]).map((t) => (
+        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg p-1 self-start border border-zinc-200 dark:border-zinc-800 overflow-x-auto max-w-full">
+          {([
+            'problems',
+            'learn',
+            'labs',
+            'exams',
+            ...(isInstructor ? ['gradebook', 'analytics'] : []),
+          ] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-md text-sm font-semibold capitalize transition-all ${
+              className={`px-3.5 py-1.5 rounded-md text-xs font-semibold capitalize whitespace-nowrap transition-all ${
                 tab === t
                   ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm'
                   : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
               }`}
             >
-              {t === 'labs' ? 'Lab Sessions' : t}
+              {t === 'labs'
+                ? `Labs (${labs.length})`
+                : t === 'learn'
+                ? `Learn (${modules.length})`
+                : t === 'exams'
+                ? `Exams (${exams.length})`
+                : t === 'analytics'
+                ? '📊 Analytics'
+                : t}
             </button>
           ))}
         </div>
@@ -439,15 +449,175 @@ export default function CoursePage() {
           </div>
         )}
 
+        {/* ── Learn Tab ── */}
+        {tab === 'learn' && (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-5 py-4">
+              <div>
+                <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Curriculum Modules</h3>
+                <p className="text-xs text-zinc-500">Structured lessons, video walkthroughs, and inline practice exercises.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  to={`/courses/${id}/learn`}
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                >
+                  Open Learning Path →
+                </Link>
+                {isInstructor && (
+                  <Link
+                    to={`/courses/${id}/modules/create`}
+                    className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 transition"
+                  >
+                    + Create Module
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {modules.map((mod, idx) => (
+                <div
+                  key={mod.id}
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 flex items-center justify-between shadow-sm"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-xs flex items-center justify-center">
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-zinc-900 dark:text-white">{mod.title}</h4>
+                      <p className="text-xs text-zinc-500 mt-0.5">{mod.description || 'Interactive learning module'}</p>
+                      <span className="text-[11px] text-zinc-400 mt-1 block">
+                        {mod.content_count} lessons & problems
+                      </span>
+                    </div>
+                  </div>
+                  <Link
+                    to={`/modules/${mod.id}`}
+                    className="px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-orange-500 hover:text-white rounded-lg text-xs font-semibold transition"
+                  >
+                    Study Lesson →
+                  </Link>
+                </div>
+              ))}
+              {modules.length === 0 && (
+                <div className="text-center py-16 text-zinc-400 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                  No learning modules published yet.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Exams Tab ── */}
+        {tab === 'exams' && (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-5 py-4">
+              <div>
+                <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Proctored Assessments</h3>
+                <p className="text-xs text-zinc-500">Timed exams with full-screen lockdown, tab-switch logging, and proctoring controls.</p>
+              </div>
+              {isInstructor && (
+                <Link
+                  to={`/courses/${id}/exams/create`}
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                >
+                  + Schedule Proctored Exam
+                </Link>
+              )}
+            </div>
+
+            <div className="grid gap-3">
+              {exams.map((exam) => (
+                <div
+                  key={exam.id}
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 flex items-center justify-center text-lg shrink-0">
+                      🛡️
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-sm text-zinc-900 dark:text-white">{exam.title}</h4>
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20">
+                          Proctored
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-1">{exam.description || 'Proctored coding assessment'}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400 mt-2 font-mono">
+                        <span>⏱ {exam.duration_minutes} mins</span>
+                        <span>•</span>
+                        <span>🖥️ Fullscreen enforced</span>
+                        <span>•</span>
+                        <span>🚫 Max {exam.tab_switch_limit} tab switches</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-2">
+                    {isInstructor ? (
+                      <Link
+                        to={`/exams/${exam.id}/results`}
+                        className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white rounded-lg text-xs font-semibold border border-zinc-200 dark:border-zinc-700 transition"
+                      >
+                        Audit & Results →
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/exams/${exam.id}`}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold shadow-sm transition"
+                      >
+                        Enter Exam →
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {exams.length === 0 && (
+                <div className="text-center py-16 text-zinc-400 text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                  No exams scheduled yet for this course.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Gradebook Tab ── */}
         {tab === 'gradebook' && isInstructor && (
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 text-center">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center flex flex-col items-center gap-4">
+            <div>
+              <h3 className="font-bold text-base text-zinc-900 dark:text-white">Student Gradebook & Performance Matrix</h3>
+              <p className="text-xs text-zinc-500 max-w-md mx-auto mt-1">
+                View student scores across problems, mandatory labs completed, and earned badges.
+              </p>
+            </div>
             <Link
               to={`/courses/${id}/gradebook`}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold text-sm shadow-lg shadow-orange-500/20 transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold text-xs shadow-md transition"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               Open Full Gradebook
+            </Link>
+          </div>
+        )}
+
+        {/* ── Analytics Tab ── */}
+        {tab === 'analytics' && isInstructor && (
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center flex flex-col items-center gap-4">
+            <div>
+              <h3 className="font-bold text-base text-zinc-900 dark:text-white">Course Analytics & Algorithmic Trends</h3>
+              <p className="text-xs text-zinc-500 max-w-md mx-auto mt-1">
+                Review per-problem pass rates, error distributions, submission volume trends, and individual student progress over time.
+              </p>
+            </div>
+            <Link
+              to={`/courses/${id}/analytics`}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-bold text-xs uppercase tracking-wider shadow-md transition"
+            >
+              <span>📊 Open Interactive Analytics Dashboard →</span>
             </Link>
           </div>
         )}
@@ -559,7 +729,21 @@ export default function CoursePage() {
                   {testCases.map((tc, idx) => (
                     <div key={idx} className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-zinc-700 dark:text-zinc-300">Case #{idx + 1}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-zinc-700 dark:text-zinc-300">Case #{idx + 1}</span>
+                          <div className="flex items-center gap-1 text-[11px] text-zinc-500">
+                            <span>Weight:</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={tc.weight ?? 1}
+                              onChange={(e) => updateTestCase(idx, 'weight', parseInt(e.target.value) || 1)}
+                              className="w-12 px-1 py-0.5 text-[11px] rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-center font-mono"
+                            />
+                            <span>pts</span>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-3">
                           <label className="flex items-center gap-1.5 cursor-pointer text-zinc-600 dark:text-zinc-400 text-[11px]">
                             <input

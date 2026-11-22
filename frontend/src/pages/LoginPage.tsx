@@ -244,6 +244,35 @@ export default function LoginPage() {
               </button>
             </form>
 
+            {/* Quick Demo Shortcuts (Offline / Preview Mode) */}
+            <div className="mt-6 pt-5 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-2">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 text-center">
+                Quick Demo Access
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await login({ email: 'instructor@codeforge.edu', password: 'password123' })
+                    navigate(redirectTo, { replace: true })
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 text-xs font-semibold border border-orange-500/30 transition text-center"
+                >
+                  Instructor Demo
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await login({ email: 'student@codeforge.edu', password: 'password123' })
+                    navigate(redirectTo, { replace: true })
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold border border-zinc-200 dark:border-zinc-700 transition text-center"
+                >
+                  Student Demo
+                </button>
+              </div>
+            </div>
+
             {/* Footer note */}
             <p className="text-center text-xs text-zinc-400 dark:text-zinc-600 mt-6">
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}

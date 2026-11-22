@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getCourses, joinCourse, createCourse, CourseResponse } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
+import Navbar from '../components/Navbar'
 
 export default function CourseListPage() {
-  const { user, logout } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { user } = useAuth()
   const navigate = useNavigate()
 
   const [courses, setCourses] = useState<CourseResponse[]>([])
@@ -77,51 +76,8 @@ export default function CourseListPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col transition-colors duration-200">
-      {/* ── Header ─────────────────────────────────────── */}
-      <header className="border-b border-zinc-200 dark:border-zinc-900 bg-white/80 dark:bg-zinc-900/20 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between transition-colors">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded bg-gradient-to-tr from-orange-600 to-orange-400 flex items-center justify-center font-bold text-white shadow-lg shadow-orange-500/10">
-            CF
-          </div>
-          <div>
-            <span className="font-bold text-lg text-zinc-900 dark:text-white tracking-tight">CodeForge</span>
-            <span className="text-zinc-500 text-xs ml-1 font-mono">v0.2.0</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 text-sm">
-          <Link
-            to="/practice"
-            className="text-zinc-500 dark:text-zinc-400 hover:text-orange-500 dark:hover:text-orange-400 text-xs font-semibold uppercase tracking-wider transition-colors"
-          >
-            Practice
-          </Link>
-          {user && (
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-xs font-bold text-orange-600 dark:text-orange-400">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-zinc-600 dark:text-zinc-400 text-xs font-medium hidden sm:block">{user.name}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-mono uppercase border border-zinc-200 dark:border-zinc-700 hidden sm:inline">
-                {user.role}
-              </span>
-            </div>
-          )}
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-zinc-800 transition-colors"
-            aria-label="Toggle Theme"
-          >
-            {theme === 'dark' ? (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z" /></svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-            )}
-          </button>
-          <button onClick={() => { logout(); navigate('/login') }} className="text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors text-xs font-medium">
-            Sign out
-          </button>
-        </div>
-      </header>
+      {/* Global Navigation */}
+      <Navbar />
 
       {/* ── Main ───────────────────────────────────────── */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10 flex flex-col gap-8">
