@@ -7,8 +7,8 @@
 All endpoints return JSON responses. Errors use standard HTTP status codes with an `{ "detail": "message" }` payload.
 
 > **Implementation status key:**
-> - ✅ Implemented & tested (Auth, Courses, Problems, Labs, Submissions, Badges, WebSocket Streaming)
-> - 📋 Phase 0 Agreed Contracts (Learning Modules, Proctored Exams, Analytics, Custom Input)
+> - ✅ Implemented & tested (Auth, Courses, Problems, Labs, Submissions, Badges, WebSocket Streaming, Learning Modules)
+> - 📋 Phase 0 Agreed Contracts (Proctored Exams, Analytics, Custom Input)
 
 ---
 
@@ -707,7 +707,7 @@ All endpoints return JSON responses. Errors use standard HTTP status codes with 
 
 ---
 
-## 8. Learning Modules Endpoints 📋
+## 8. Learning Modules Endpoints ✅
 
 ### 8.1 Create Learning Module
 - **Endpoint:** `POST /api/v1/courses/{course_id}/modules`

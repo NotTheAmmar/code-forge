@@ -38,6 +38,9 @@ from app.models.badge import Badge
 from app.models.course import Course
 from app.models.enrollment import Enrollment
 from app.models.lab_session import LabSession, LabSessionProblem
+from app.models.learning_content import LearningContent
+from app.models.learning_module import LearningModule
+from app.models.module_progress import ModuleProgress
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.test_case import TestCase
@@ -501,6 +504,137 @@ async def seed() -> None:
                             earned_at=now - timedelta(minutes=(60 - order * 10)),
                         )
                         session.add(badge)
+
+        # ── 7. Seed Learning Modules & Interactive Contents ───────────────────
+        module_specs = [
+            {
+                "title": "Module 1: Introduction to Python & Algorithms",
+                "description": "Foundations of dynamic typing, object references, and simple input/output programs.",
+                "order_index": 1,
+                "is_published": True,
+                "contents": [
+                    {
+                        "content_type": "text",
+                        "title": "Understanding Python Variables & Memory Model",
+                        "body": "## Variables in Python\n\nIn Python, variables are references to objects in memory, not direct memory addresses.\n\n### Key Principles:\n- **Dynamic Typing:** You do not declare types explicitly. Types are bound at runtime.\n- **First-Class Objects:** Functions, numbers, and classes are all first-class objects.\n- **Pass-by-Object-Reference:** Arguments to functions bind references to caller objects.",
+                        "problem_slug": None,
+                        "order_index": 1,
+                    },
+                    {
+                        "content_type": "video",
+                        "title": "Python Control Flow & Functions Masterclass",
+                        "body": "https://www.youtube.com/watch?v=kqtD5dpn9C8",
+                        "problem_slug": None,
+                        "order_index": 2,
+                    },
+                    {
+                        "content_type": "problem",
+                        "title": "Practice: Hello World & Stdin Basics",
+                        "body": "Apply basic stdin reading and output formatting with the standard Hello World exercise.",
+                        "problem_slug": "hello-world",
+                        "order_index": 3,
+                    },
+                ],
+            },
+            {
+                "title": "Module 2: Algorithmic Thinking & Control Flow",
+                "description": "Conditional branching, loop invariants, and algorithmic complexity trade-offs.",
+                "order_index": 2,
+                "is_published": True,
+                "contents": [
+                    {
+                        "content_type": "text",
+                        "title": "Branching Invariants & Edge Case Handling",
+                        "body": "## Writing Resilient Conditionals\n\nWhen implementing competitive programming algorithms:\n1. Check constraints and boundary conditions (empty input, negative values).\n2. Order conditions from most restrictive to least restrictive.\n3. Keep predicates pure and side-effect free.",
+                        "problem_slug": None,
+                        "order_index": 1,
+                    },
+                    {
+                        "content_type": "video",
+                        "title": "Loops, Comprehensions, and Invariants",
+                        "body": "https://www.youtube.com/watch?v=6iF8Xb7Z3wQ",
+                        "problem_slug": None,
+                        "order_index": 2,
+                    },
+                    {
+                        "content_type": "problem",
+                        "title": "Practice: FizzBuzz Logic",
+                        "body": "Implement classical 3/5 division logic handling overlapping multiples of 15.",
+                        "problem_slug": "fizzbuzz",
+                        "order_index": 3,
+                    },
+                ],
+            },
+        ]
+
+        seeded_modules = []
+        for m_spec in module_specs:
+            mod_res = await session.execute(
+                select(LearningModule).where(
+                    LearningModule.course_id == course.id,
+                    LearningModule.title == m_spec["title"],
+                )
+            )
+            mod = mod_res.scalar_one_or_none()
+            if mod is None:
+                mod = LearningModule(
+                    id=uuid.uuid4(),
+                    course_id=course.id,
+                    title=m_spec["title"],
+                    description=m_spec["description"],
+                    order_index=m_spec["order_index"],
+                    is_published=m_spec["is_published"],
+                    created_by=instructor.id,
+                )
+                session.add(mod)
+                await session.flush()
+                logger.info("Created learning module: %s", mod.title)
+            seeded_modules.append(mod)
+
+            for c_spec in m_spec["contents"]:
+                cnt_res = await session.execute(
+                    select(LearningContent).where(
+                        LearningContent.module_id == mod.id,
+                        LearningContent.title == c_spec["title"],
+                    )
+                )
+                if cnt_res.scalar_one_or_none() is None:
+                    linked_prob_id = None
+                    if c_spec["problem_slug"] and c_spec["problem_slug"] in problem_map:
+                        linked_prob_id = problem_map[c_spec["problem_slug"]].id
+
+                    cnt = LearningContent(
+                        id=uuid.uuid4(),
+                        module_id=mod.id,
+                        content_type=c_spec["content_type"],
+                        title=c_spec["title"],
+                        body=c_spec["body"],
+                        problem_id=linked_prob_id,
+                        order_index=c_spec["order_index"],
+                    )
+                    session.add(cnt)
+
+        # Pre-seed completion for Diana and Alice on Module 1
+        if seeded_modules:
+            m1 = seeded_modules[0]
+            for user_email in ["diana@codeforge.local", "alice@codeforge.local"]:
+                u = student_users[user_email]
+                prog_chk = await session.execute(
+                    select(ModuleProgress).where(
+                        ModuleProgress.module_id == m1.id,
+                        ModuleProgress.user_id == u.id,
+                    )
+                )
+                if prog_chk.scalar_one_or_none() is None:
+                    session.add(
+                        ModuleProgress(
+                            id=uuid.uuid4(),
+                            module_id=m1.id,
+                            user_id=u.id,
+                            is_completed=True,
+                            completed_at=now - timedelta(hours=2),
+                        )
+                    )
 
         await session.commit()
 

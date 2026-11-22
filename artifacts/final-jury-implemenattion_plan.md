@@ -294,37 +294,33 @@ exam_violations
   - Infinite loop → should hit timeout.
   - Disk write abuse (write large file to `/tmp`) → should hit tmpfs size limit.
 
-### Phase A3: Learning Modules System (2-3 hours)
+### Phase A3: Learning Modules System (2-3 hours) ✅ Completed
 
 **Models:**
-- [ ] Create `LearningModule` model (`app/models/learning_module.py`).
-- [ ] Create `LearningContent` model (`app/models/learning_content.py`).
-- [ ] Create `ModuleProgress` model (`app/models/module_progress.py`).
+- [x] Create `LearningModule` model (`app/models/learning_module.py`).
+- [x] Create `LearningContent` model (`app/models/learning_content.py`).
+- [x] Create `ModuleProgress` model (`app/models/module_progress.py`).
 
 **Schemas:**
-- [ ] `ModuleCreate` (title, description, order_index).
-- [ ] `ModuleResponse` (id, title, description, order_index, content_count, is_published, progress for current user).
-- [ ] `ModuleDetailResponse` (includes list of contents).
-- [ ] `ContentCreate` (content_type, title, body, problem_id, order_index).
-- [ ] `ContentResponse`.
-- [ ] `ModuleProgressResponse` (modules with completion status).
+- [x] `ModuleCreate` (title, description, order_index, is_published).
+- [x] `ModuleResponse` (id, title, description, order_index, content_count, is_published, is_completed).
+- [x] `ModuleDetailResponse` (includes list of contents).
+- [x] `ContentCreate` (content_type, title, body, problem_id, order_index).
+- [x] `ContentResponse` and `ContentUpdate`.
+- [x] `ModuleProgressResponse` and `CourseProgressResponse`.
 
 **Router (`app/routers/modules.py`):**
-- [ ] Full CRUD for modules and contents (instructor-gated).
-- [ ] Progress tracking endpoints (student marks content as viewed / module as complete).
-- [ ] List modules with per-student progress data.
+- [x] Full CRUD for modules and contents (instructor-gated, course access enforced).
+- [x] Progress tracking endpoints (`POST /modules/{id}/complete` marks module as completed).
+- [x] List modules with per-student progress data (`GET /courses/{id}/modules`, `GET /courses/{id}/module-progress`).
+- [x] Registered router in `app/main.py`.
 
 **Seed Data:**
-- [ ] Seed 2-3 learning modules into the CS101 course with actual content:
-  - **Module 1: "Python Basics"** — 3-4 content items:
-    - Text: "What is Python?" with real introductory theory.
-    - Video: Embedded YouTube link (e.g., a popular Python tutorial).
-    - Text: "Variables and Data Types" with examples.
-    - Practice problem: Link to `hello-world` problem.
-  - **Module 2: "Control Flow"** — 3-4 content items:
-    - Text: "If/Else Statements" with examples.
-    - Video: YouTube link on control flow.
-    - Practice problem: Link to `fizzbuzz` problem.
+- [x] Seed 2 learning modules into the CS101 course with actual content:
+  - **Module 1: "Introduction to Python & Algorithms"** — Text lesson on Python memory model, YouTube video masterclass, practice challenge linked to `hello-world`.
+  - **Module 2: "Algorithmic Thinking & Control Flow"** — Text lesson on branching invariants, YouTube video on loop invariants, practice challenge linked to `fizzbuzz`.
+  - Pre-seeded progress records for demo students (Diana, Alice).
+- [x] Automated test suite: 127/127 tests passed in `tests/test_modules.py` and across all suites.
 
 ### Phase A4: Proctored Exam System (3-4 hours)
 
