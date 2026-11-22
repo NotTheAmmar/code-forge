@@ -129,6 +129,7 @@ code-forge/
 │   └── fizzbuzz/
 ├── monitoring/                # Prometheus and Grafana dashboards configuration
 └── artifacts/                 # Architecture specifications & operational documentation
+    ├── how-to-run.md          # Complete How-To-Run & Final Jury demonstration guide
     ├── backend-architecture.md# Complete backend architecture specification
     ├── frontend.md            # Frontend architecture & route map
     ├── api-contracts.md       # API contract reference
