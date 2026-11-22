@@ -280,7 +280,9 @@ def _compile_and_run(
         })
 
     total_cases = len(test_cases)
-    score = round((total_passed / total_cases) * 100) if total_cases > 0 else 0
+    total_weight = sum((tc.weight if getattr(tc, "weight", None) is not None and tc.weight > 0 else 1) for tc in test_cases)
+    passed_weight = sum((tc.weight if getattr(tc, "weight", None) is not None and tc.weight > 0 else 1) for tc, r in zip(test_cases, results) if r.get("passed"))
+    score = round((passed_weight / total_weight) * 100) if total_weight > 0 else 0
 
     # Determine overall status
     any_timeout = any(r.get("error") == "Time Limit Exceeded" for r in results)
@@ -320,8 +322,9 @@ def _compile_and_run(
 def _compile_code(
     docker_client,
     tmp_dir: str,
-    problem: Problem,
+    problem: Problem | None = None,
     language: str = "java",
+    memory_limit_mb: int = 128,
 ) -> dict:
     """Compile source code (Java, C, or C++) inside a hardened sandbox container.
 
@@ -353,13 +356,14 @@ def _compile_code(
         is_binary = False
 
     try:
+        mem_mb = problem.memory_limit_mb if problem is not None else memory_limit_mb
         # Create container with strict resource and process limits
         container = docker_client.containers.create(
             image=sandbox_img,
             command=compile_cmd,
             working_dir=SANDBOX_WORKDIR,
             network_disabled=True,
-            mem_limit=f"{problem.memory_limit_mb}m",
+            mem_limit=f"{mem_mb}m",
             cpu_quota=50000,
             cpu_period=100000,
             cap_drop=["ALL"],
@@ -669,3 +673,151 @@ def _get_docker_client():
             "Ensure the Docker socket is mounted: "
             "-v /var/run/docker.sock:/var/run/docker.sock"
         ) from e
+
+
+def execute_custom_code(
+    source_code: str,
+    language: str,
+    stdin_data: str = "",
+    time_limit_sec: int = 5,
+    memory_limit_mb: int = 128,
+) -> dict:
+    """Execute arbitrary student code with custom stdin in an isolated sandbox.
+
+    Does not evaluate test cases, does not record submissions or modify leaderboard.
+    """
+    lang = (language or "python").strip().lower()
+    if lang not in SANDBOX_IMAGES:
+        return {
+            "language": lang,
+            "status": "error",
+            "stdout": None,
+            "stderr": f"Unsupported language: '{lang}'",
+            "execution_time_ms": 0,
+            "exit_code": 1,
+        }
+
+    tmp_dir = tempfile.mkdtemp(prefix="codeforge_custom_")
+    docker_client = _get_docker_client()
+    container = None
+    start_time = time.monotonic()
+
+    try:
+        # Write source code
+        if lang == "python":
+            src_file = os.path.join(tmp_dir, "Solution.py")
+            copy_exts = (".py", ".txt")
+            exec_cmd = ["sh", "-c", "python3 Solution.py < /code/stdin.txt"]
+            sandbox_img = SANDBOX_PYTHON_IMAGE
+        elif lang == "c":
+            src_file = os.path.join(tmp_dir, "Solution.c")
+            copy_exts = ("solution", ".txt")
+            exec_cmd = ["sh", "-c", "chmod +x ./solution 2>/dev/null; ./solution < /code/stdin.txt"]
+            sandbox_img = SANDBOX_C_IMAGE
+        elif lang == "cpp":
+            src_file = os.path.join(tmp_dir, "Solution.cpp")
+            copy_exts = ("solution", ".txt")
+            exec_cmd = ["sh", "-c", "chmod +x ./solution 2>/dev/null; ./solution < /code/stdin.txt"]
+            sandbox_img = SANDBOX_CPP_IMAGE
+        else:
+            src_file = os.path.join(tmp_dir, "Solution.java")
+            copy_exts = (".class", ".txt")
+            exec_cmd = ["sh", "-c", "java -cp /code Solution < /code/stdin.txt"]
+            sandbox_img = SANDBOX_JAVA_IMAGE
+
+        with open(src_file, "w", encoding="utf-8") as f:
+            f.write(source_code)
+
+        # Write stdin.txt
+        stdin_file = os.path.join(tmp_dir, "stdin.txt")
+        with open(stdin_file, "w", encoding="utf-8") as f:
+            f.write(stdin_data)
+
+        # Compilation if needed
+        if lang in ("java", "c", "cpp"):
+            compile_res = _compile_code(
+                docker_client=docker_client,
+                tmp_dir=tmp_dir,
+                problem=None,
+                language=lang,
+                memory_limit_mb=memory_limit_mb,
+            )
+            if not compile_res["success"]:
+                return {
+                    "language": lang,
+                    "status": "compile_error",
+                    "stdout": None,
+                    "stderr": compile_res.get("error"),
+                    "execution_time_ms": 0,
+                    "exit_code": 1,
+                }
+
+        # Run container
+        container = docker_client.containers.create(
+            image=sandbox_img,
+            command=exec_cmd,
+            working_dir=SANDBOX_WORKDIR,
+            network_disabled=True,
+            mem_limit=f"{memory_limit_mb}m",
+            cpu_quota=50000,
+            cpu_period=100000,
+            cap_drop=["ALL"],
+            security_opt=["no-new-privileges"],
+            user="runner",
+            pids_limit=settings.sandbox_pids_limit,
+            ulimits=[
+                docker.types.Ulimit(
+                    name="nofile",
+                    soft=settings.sandbox_ulimit_nofile,
+                    hard=settings.sandbox_ulimit_nofile,
+                )
+            ],
+            tmpfs={"/tmp": f"size={settings.sandbox_tmpfs_size},noexec,nosuid"},
+        )
+
+        _copy_files_to_container(container, tmp_dir, extensions=copy_exts)
+        container.start()
+
+        try:
+            exit_result = container.wait(timeout=time_limit_sec + 2)
+            exit_code = exit_result.get("StatusCode", -1)
+        except Exception:
+            try:
+                container.kill()
+            except Exception:
+                pass
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            return {
+                "language": lang,
+                "status": "timeout",
+                "stdout": None,
+                "stderr": "Time Limit Exceeded",
+                "execution_time_ms": elapsed_ms,
+                "exit_code": -1,
+            }
+
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
+        stdout_logs = container.logs(stdout=True, stderr=False)
+        stderr_logs = container.logs(stdout=False, stderr=True)
+        if isinstance(stdout_logs, bytes):
+            stdout_logs = stdout_logs.decode("utf-8", errors="replace")
+        if isinstance(stderr_logs, bytes):
+            stderr_logs = stderr_logs.decode("utf-8", errors="replace")
+
+        status_str = "completed" if exit_code == 0 else "runtime_error"
+        return {
+            "language": lang,
+            "status": status_str,
+            "stdout": stdout_logs.rstrip() if stdout_logs else None,
+            "stderr": stderr_logs.rstrip() if stderr_logs else None,
+            "execution_time_ms": elapsed_ms,
+            "exit_code": exit_code,
+        }
+
+    finally:
+        if container is not None:
+            try:
+                container.remove(force=True)
+            except Exception:
+                pass
+        shutil.rmtree(tmp_dir, ignore_errors=True)

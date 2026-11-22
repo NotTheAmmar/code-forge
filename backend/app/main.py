@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import settings
+from app.routers.analytics import router as analytics_router
 from app.routers.auth import router as auth_router
 from app.routers.courses import router as courses_router
 from app.routers.exams import router as exams_router
@@ -33,6 +34,7 @@ Instrumentator().instrument(app).expose(app)
 # ── Routers ───────────────────────────────────────────────────────────────────
 API_PREFIX = "/api/v1"
 
+app.include_router(analytics_router, prefix=API_PREFIX)
 app.include_router(auth_router, prefix=API_PREFIX)
 app.include_router(courses_router, prefix=API_PREFIX)
 app.include_router(exams_router, prefix=API_PREFIX)

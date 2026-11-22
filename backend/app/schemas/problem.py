@@ -86,3 +86,20 @@ class BulkImportResponse(BaseModel):
     failed_count: int
     imported_slugs: list[str]
     errors: list[str] = Field(default_factory=list)
+
+
+# ── Custom Input Execution ────────────────────────────────────────────────────
+
+class RunCustomRequest(BaseModel):
+    source_code: str = Field(..., min_length=1)
+    language: Literal["java", "python", "c", "cpp"] = "python"
+    stdin: str = ""
+
+
+class RunCustomResponse(BaseModel):
+    language: str
+    status: str
+    stdout: str | None = None
+    stderr: str | None = None
+    execution_time_ms: int = 0
+    exit_code: int = 0

@@ -362,28 +362,42 @@ exam_violations
 - [x] Automated test suite in `tests/test_exams.py` (6 tests covering full lifecycle, permissions, time checks, concealment, violation thresholds, scoring, and CRUD).
 - [x] Full test suite verification: **133/133 passed** (`docker compose run --rm api pytest -v`).
 
-### Phase A5: Analytics + Advanced Grading + Custom Input (2-3 hours)
+### Phase A5: Analytics + Advanced Grading + Custom Input (2-3 hours) ✅ Completed
 
-**Analytics (`app/routers/analytics.py`):**
-- [ ] `GET /courses/{id}/analytics` — aggregate:
-  - Per-problem: pass rate (%), average score, submission count, most common error type.
-  - Per-student: total submissions, improvement trend (scores over time), active days.
-  - Class-wide: total submissions, average pass rate, completion rate.
-- [ ] `GET /problems/{id}/analytics` — detailed per-problem stats.
-- [ ] Return data structured for frontend charting (arrays of `{label, value}` pairs).
+**Analytics (`app/routers/analytics.py` & `app/schemas/analytics.py`):**
+- [x] `GET /courses/{id}/analytics` — aggregate:
+  - Summary stats: `total_students`, `total_submissions`, `average_pass_rate`, `active_students_7d`.
+  - Per-problem stats: `problem_pass_rates` (`problem_id`, `title`, `difficulty`, `submissions_count`, `pass_rate`, `average_score`).
+  - Error breakdown: `common_error_distribution` (`compile_error`, `timeout`, `runtime_error`, `wrong_answer`).
+  - Submission trend: `submission_trends` over the past 7 days (`date`, `count`).
+- [x] `GET /courses/{id}/analytics/students/{user_id}` — individual student profile:
+  - `total_submissions`, `problems_solved`, `badges_earned`.
+  - `score_progression` timeline (`submitted_at`, `problem`, `score`).
+  - Gated to course instructor or the student themselves.
+- [x] `GET /problems/{id_or_slug}/analytics` — detailed per-problem stats:
+  - `total_submissions`, `unique_students`, `pass_rate`.
+  - `language_breakdown` (`python`, `java`, `c`, `cpp` counts).
+  - `average_execution_time_ms`.
+- [x] Registered `analytics_router` in `app/main.py`.
 
-**Advanced Grading:**
-- [ ] Add `weight` column to `test_cases` table (default 1) — partial credit per test case.
-- [ ] Update score calculation in `sandbox.py`:
-  - Score = (sum of passed weights / sum of total weights) × 100, rounded.
-  - Current: score = (passed_count / total_count) × 100.
-- [ ] `PUT /problems/{id}` — allow setting weights per test case.
+**Advanced Grading & Partial Credit:**
+- [x] `test_cases.weight` column (default 1) integrated from Phase 0 migration.
+- [x] Updated score calculation in `app/worker/sandbox.py`:
+  - `score = round((passed_weight / total_weight) * 100)`.
+  - Gracefully falls back to 1 for backward compatibility.
 
-**Custom Input:**
-- [ ] `POST /problems/{slug}/run-custom` — accepts `{ source_code, language, stdin }`.
-- [ ] Runs code in sandbox with the student's custom stdin.
-- [ ] Returns stdout, stderr, execution time — no test case comparison.
-- [ ] Rate-limit to prevent abuse (max 10 custom runs per minute per user).
+**Custom Input Execution:**
+- [x] `POST /problems/{slug}/run-custom` in `app/routers/problems.py`:
+  - Accepts `RunCustomRequest` (`source_code`, `language`, `stdin`).
+  - Executes isolated sandbox container with student-provided stdin via `execute_custom_code` in `app/worker/sandbox.py`.
+  - Returns `RunCustomResponse` (`language`, `status`, `stdout`, `stderr`, `execution_time_ms`, `exit_code`).
+  - Rate limiting enforced at 10 custom executions/minute per user via Redis.
+  - Does not pollute submission history, leaderboards, or badge counts.
+
+**Testing & Verification:**
+- [x] Created `tests/test_analytics.py` (4 tests covering course analytics, permission gating, student profile progression, problem metrics).
+- [x] Created `tests/test_custom_input.py` (7 tests covering Python/C/C++ custom execution, compile error reporting, rate limiting, and partial credit scoring).
+- [x] Full test suite verification: **144/144 passed** (`docker compose run --rm api pytest -v`).
 
 ### Phase A6: Installer + Deployment Polish (1-2 hours)
 

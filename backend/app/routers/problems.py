@@ -11,23 +11,32 @@ Note: Course-scoped problem CRUD lives in app/routers/courses.py.
 
 import uuid
 
+import anyio
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.dependencies import get_db, get_current_user
 from app.models.lab_session import LabSession, LabSessionProblem
 from app.models.problem import Problem
 from app.models.submission import Submission
 from app.models.user import User
-from app.schemas.problem import ProblemDetail, ProblemSummary
+from app.schemas.problem import (
+    ProblemDetail,
+    ProblemSummary,
+    RunCustomRequest,
+    RunCustomResponse,
+)
 from app.schemas.submission import (
     RunRequest,
     SubmissionCreated,
     SubmissionSummaryResponse,
     SubmitRequest,
 )
+from app.worker.sandbox import execute_custom_code
 from app.worker.tasks import grade_submission
 
 router = APIRouter(prefix="/problems", tags=["problems"])
@@ -202,6 +211,60 @@ async def get_submission_history(
         out.append(item)
 
     return out
+
+
+# ── POST /problems/{slug}/run-custom ──────────────────────────────────────────
+
+@router.post("/{slug}/run-custom", response_model=RunCustomResponse)
+async def run_custom_code(
+    slug: str,
+    body: RunCustomRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RunCustomResponse:
+    """Run student code with custom stdin against the problem's time & memory limits.
+
+    Does not evaluate against problem test cases, does not store a submission,
+    and does not affect leaderboards or badges. Rate limited to 10 runs/min.
+    """
+    problem = await _get_problem_or_404(slug, db)
+
+    # Rate limiting: 10 req/min per user
+    try:
+        redis_client = aioredis.from_url(settings.redis_url)
+        key = f"rate:run_custom:{current_user.id}"
+        req_count = await redis_client.incr(key)
+        if req_count == 1:
+            await redis_client.expire(key, 60)
+        await redis_client.aclose()
+        if req_count > 10:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Rate limit exceeded. Maximum 10 custom runs per minute.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        # If redis error, do not block execution
+        pass
+
+    result = await anyio.to_thread.run_sync(
+        execute_custom_code,
+        body.source_code,
+        body.language,
+        body.stdin,
+        problem.time_limit_sec,
+        problem.memory_limit_mb,
+    )
+
+    return RunCustomResponse(
+        language=result["language"],
+        status=result["status"],
+        stdout=result.get("stdout"),
+        stderr=result.get("stderr"),
+        execution_time_ms=result.get("execution_time_ms", 0),
+        exit_code=result.get("exit_code", 0),
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
