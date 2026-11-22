@@ -8,11 +8,12 @@ from app.routers.courses import router as courses_router
 from app.routers.labs import router as labs_router
 from app.routers.problems import router as problems_router
 from app.routers.submissions import router as submissions_router
+from app.websocket.submissions_ws import router as ws_router
 
 app = FastAPI(
     title="CodeForge API",
     description="Browser-based competitive programming judge — sandboxed code execution engine.",
-    version="0.5.0",
+    version="0.6.0",
 )
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
@@ -35,6 +36,8 @@ app.include_router(courses_router, prefix=API_PREFIX)
 app.include_router(labs_router, prefix=API_PREFIX)
 app.include_router(problems_router, prefix=API_PREFIX)
 app.include_router(submissions_router, prefix=API_PREFIX)
+app.include_router(ws_router, prefix=API_PREFIX)
+app.include_router(ws_router, prefix="")
 
 
 # ── Health check ─────────────────────────────────────────────────────────────

@@ -7,8 +7,8 @@
 All endpoints return JSON responses. Errors use standard HTTP status codes with an `{ "detail": "message" }` payload.
 
 > **Implementation status key:**
-> - ✅ Implemented & tested (Auth, Courses, Problems, Labs, Submissions, Badges)
-> - 📋 Phase 0 Agreed Contracts (Learning Modules, Proctored Exams, Analytics, WebSocket, Custom Input)
+> - ✅ Implemented & tested (Auth, Courses, Problems, Labs, Submissions, Badges, WebSocket Streaming)
+> - 📋 Phase 0 Agreed Contracts (Learning Modules, Proctored Exams, Analytics, Custom Input)
 
 ---
 
@@ -1190,7 +1190,7 @@ All endpoints return JSON responses. Errors use standard HTTP status codes with 
 
 ---
 
-## 11. Real-Time WebSocket Streaming Protocol 📋
+## 11. Real-Time WebSocket Streaming Protocol ✅
 
 ### 11.1 Real-Time Submission WebSocket
 - **Protocol:** `ws://` / `wss://`

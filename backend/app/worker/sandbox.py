@@ -118,6 +118,14 @@ def execute_submission(submission_id: str) -> dict:
         submission.status = "running"
         session.commit()
 
+        from app.websocket.submissions_ws import publish_submission_event
+        publish_submission_event(submission_id, {
+            "event": "status",
+            "submission_id": submission_id,
+            "status": "running",
+            "message": "Initializing execution environment",
+        })
+
         # ── Work in a temp directory ────────────────────────────────────────
         tmp_dir = tempfile.mkdtemp(prefix="codeforge_")
         try:
@@ -146,6 +154,8 @@ def _compile_and_run(
     """Write source, compile (if Java), then run each test case."""
     lang = (submission.language or "java").strip().lower()
 
+    from app.websocket.submissions_ws import publish_submission_event
+
     if lang == "python":
         source_path = os.path.join(tmp_dir, "Solution.py")
         with open(source_path, "w", encoding="utf-8") as f:
@@ -157,6 +167,13 @@ def _compile_and_run(
             f.write(submission.source_code)
 
         # ── Step 1: Compile ────────────────────────────────────────────────────
+        publish_submission_event(str(submission.id), {
+            "event": "status",
+            "submission_id": str(submission.id),
+            "status": "compiling",
+            "message": "Compiling source code in sandbox container",
+        })
+
         compile_result = _compile_java(docker_client, tmp_dir, problem)
 
         if not compile_result["success"]:
@@ -182,6 +199,20 @@ def _compile_and_run(
             logger.info(
                 "Submission %s: compile error", submission.id
             )
+            publish_submission_event(str(submission.id), {
+                "event": "completed",
+                "submission_id": str(submission.id),
+                "problem_id": str(submission.problem_id),
+                "user_id": str(submission.user_id) if submission.user_id else None,
+                "language": lang,
+                "status": "compile_error",
+                "score": 0,
+                "passed_cases": 0,
+                "total_cases": len(test_cases),
+                "results_json": submission.results_json,
+                "execution_time_ms": 0,
+                "error": compile_result["error"],
+            })
             return {
                 "status": "compile_error",
                 "score": 0,
@@ -192,11 +223,24 @@ def _compile_and_run(
             }
 
     # ── Step 2: Run each test case ─────────────────────────────────────────
+    publish_submission_event(str(submission.id), {
+        "event": "status",
+        "submission_id": str(submission.id),
+        "status": "running",
+        "message": f"Evaluating against {len(test_cases)} test cases",
+    })
+
     results = []
     total_passed = 0
     total_time_ms = 0
 
-    for tc in test_cases:
+    for idx, tc in enumerate(test_cases):
+        publish_submission_event(str(submission.id), {
+            "event": "status",
+            "submission_id": str(submission.id),
+            "status": "running",
+            "message": f"Running Test {idx + 1} of {len(test_cases)} ({tc.label})...",
+        })
         tc_result = _run_test_case(
             docker_client=docker_client,
             test_case=tc,
@@ -209,6 +253,15 @@ def _compile_and_run(
         if tc_result["passed"]:
             total_passed += 1
         total_time_ms += tc_result.get("execution_time_ms") or 0
+
+        publish_submission_event(str(submission.id), {
+            "event": "test_progress",
+            "submission_id": str(submission.id),
+            "status": "running",
+            "current_case": idx + 1,
+            "total_cases": len(test_cases),
+            "case_result": tc_result,
+        })
 
     total_cases = len(test_cases)
     score = round((total_passed / total_cases) * 100) if total_cases > 0 else 0

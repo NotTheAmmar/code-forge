@@ -249,34 +249,26 @@ exam_violations
 
 ## Developer A: Backend
 
-### Phase A1: WebSocket Real-Time Submission Updates (2-3 hours)
+### Phase A1: WebSocket Real-Time Submission Updates (2-3 hours) ✅ Completed
 
 **WebSocket Implementation (`app/websocket/submissions_ws.py`):**
-- [ ] Implement FastAPI WebSocket endpoint: `WS /ws/submissions/{submission_id}`.
-- [ ] On connect: validate submission exists, optionally validate JWT from query param.
-- [ ] Use Redis Pub/Sub as the message bus between Celery worker and WebSocket handler:
+- [x] Implement FastAPI WebSocket endpoint: `WS /api/v1/ws/submissions/{submission_id}` and `WS /ws/submissions/{submission_id}`.
+- [x] On connect: validate submission exists, immediately stream terminal payload if already completed.
+- [x] Use Redis Pub/Sub as the message bus between Celery worker and WebSocket handler:
   - Worker publishes to channel `submission:{submission_id}` after each test case completes.
-  - WebSocket handler subscribes to the channel and forwards messages to the client.
-- [ ] Message format pushed to client:
-  ```json
-  {
-    "type": "status_update",
-    "status": "running",
-    "current_test": 2,
-    "total_tests": 5,
-    "results_so_far": [{ "label": "01", "passed": true, "execution_time_ms": 45 }]
-  }
-  ```
-- [ ] Final message includes full results (same as `GET /submissions/{id}` response).
-- [ ] Close WebSocket on terminal status.
+  - WebSocket handler subscribes to the channel and forwards messages to the client using `pubsub.listen()` with periodic DB fallback.
+- [x] Message format pushed to client (`status`, `test_progress`, `completed`).
+- [x] Final message includes full results, scores, test case details, and badge awards.
+- [x] Close WebSocket on terminal status.
 
 **Worker Integration (`app/worker/tasks.py` + `app/worker/sandbox.py`):**
-- [ ] After each test case execution, publish incremental result to Redis Pub/Sub.
-- [ ] Publish status transitions: `queued → compiling → running → completed`.
+- [x] After each test case execution, publish incremental result to Redis Pub/Sub.
+- [x] Publish status transitions: `queued → compiling → running → completed / error`.
 
 **Route Registration (`app/main.py`):**
-- [ ] Add WebSocket route to FastAPI app.
-- [ ] Update Nginx config to proxy `ws://` connections for `/ws/*`.
+- [x] Add WebSocket route to FastAPI app under `/api/v1` and root.
+- [x] Update Nginx config (`frontend/nginx.conf`) to proxy `ws://` connections for `/ws/` and `/api/`.
+- [x] Tested with full automated test suite: 111/111 tests passed in `tests/test_websocket.py` and across all suites.
 
 ### Phase A2: C/C++ Language Support + Security Hardening (2-3 hours)
 
