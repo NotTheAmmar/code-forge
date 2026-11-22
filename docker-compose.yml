@@ -2,6 +2,7 @@ services:
   # ── Module 1: Frontend ───────────────────────────────────────────────────────
   web:
     build: ./frontend
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
@@ -12,6 +13,7 @@ services:
   # ── Module 2: Backend API ────────────────────────────────────────────────────
   api:
     build: ./backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
     env_file:
@@ -26,17 +28,24 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - submissions:/app/submissions
       - ./problems:/app/problems:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - codeforge_network
 
   # ── Module 3: Celery Worker ──────────────────────────────────────────────────
   worker:
     build: ./backend
+    restart: unless-stopped
     command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=4
     env_file:
       - .env
@@ -54,21 +63,28 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - codeforge_network
 
   # ── Module 4: Message Broker ─────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - codeforge_network
 
   # ── Module 5: Database ───────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       - POSTGRES_DB=codeforge
       - POSTGRES_USER=codeforge
@@ -86,6 +102,7 @@ services:
   # ── Monitoring Stack ─────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:latest
+    restart: unless-stopped
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
@@ -95,6 +112,7 @@ services:
 
   grafana:
     image: grafana/grafana:latest
+    restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
@@ -104,6 +122,7 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
+    restart: unless-stopped
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro

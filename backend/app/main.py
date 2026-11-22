@@ -1,8 +1,12 @@
-from fastapi import FastAPI
+import redis.asyncio as aioredis
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.db import get_db
 from app.routers.analytics import router as analytics_router
 from app.routers.auth import router as auth_router
 from app.routers.courses import router as courses_router
@@ -51,3 +55,33 @@ app.include_router(ws_router, prefix="")
 async def health() -> dict:
     """Liveness probe — returns OK when the API is up."""
     return {"status": "ok", "service": "codeforge-api"}
+
+
+@app.get("/health/ready", tags=["meta"])
+async def readiness_probe(db: AsyncSession = Depends(get_db)) -> dict:
+    """Readiness probe — verifies database and message broker availability."""
+    checks = {"database": "disconnected", "redis": "disconnected"}
+    is_ready = True
+
+    # Check DB
+    try:
+        await db.execute(text("SELECT 1"))
+        checks["database"] = "connected"
+    except Exception as e:
+        is_ready = False
+        checks["database"] = f"error: {str(e)}"
+
+    # Check Redis
+    try:
+        r = aioredis.from_url(settings.redis_url)
+        await r.ping()
+        await r.aclose()
+        checks["redis"] = "connected"
+    except Exception as e:
+        is_ready = False
+        checks["redis"] = f"error: {str(e)}"
+
+    if not is_ready:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=checks)
+
+    return {"status": "ready", "service": "codeforge-api", **checks}

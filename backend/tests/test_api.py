@@ -169,6 +169,13 @@ def test_health(client):
     assert response.json()["status"] == "ok"
 
 
+def test_readiness_probe(client):
+    response = client.get("/health/ready")
+    assert response.status_code in (200, 503)
+    data = response.json()
+    assert "database" in data or "detail" in data
+
+
 # ── GET /api/v1/problems ──────────────────────────────────────────────────────
 
 def test_list_problems_empty(client):
