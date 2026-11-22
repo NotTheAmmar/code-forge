@@ -68,6 +68,17 @@ class Course(Base):
         back_populates="course",
         cascade="all, delete-orphan",
     )
+    learning_modules: Mapped[list["LearningModule"]] = relationship(  # noqa: F821
+        "LearningModule",
+        back_populates="course",
+        cascade="all, delete-orphan",
+        order_by="LearningModule.order_index",
+    )
+    exams: Mapped[list["Exam"]] = relationship(  # noqa: F821
+        "Exam",
+        back_populates="course",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<Course id={self.id} title={self.title!r} invite_code={self.invite_code!r}>"

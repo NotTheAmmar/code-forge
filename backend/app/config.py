@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     sandbox_cpu_limit: float = 0.5
     sandbox_default_timeout: int = 10
     sandbox_tmpfs_size: str = "32m"
+    sandbox_pids_limit: int = 64
 
     # Docker
     docker_host: str = "unix:///var/run/docker.sock"

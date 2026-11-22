@@ -63,6 +63,16 @@ class Problem(Base):
         nullable=True,
         comment="Python starter template shown in the editor",
     )
+    starter_code_c: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="C starter template shown in the editor",
+    )
+    starter_code_cpp: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="C++ starter template shown in the editor",
+    )
     time_limit_sec: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

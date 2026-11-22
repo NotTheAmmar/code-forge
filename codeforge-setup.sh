@@ -157,6 +157,20 @@ build_sandboxes() {
         info "Sandbox image 'codeforge-sandbox-python' already present."
     fi
 
+    if [ "${force_build}" = "true" ] || ! docker image inspect codeforge-sandbox-c >/dev/null 2>&1; then
+        info "Building C sandbox container image (codeforge-sandbox-c)..."
+        docker build -t codeforge-sandbox-c ./sandbox/c
+    else
+        info "Sandbox image 'codeforge-sandbox-c' already present."
+    fi
+
+    if [ "${force_build}" = "true" ] || ! docker image inspect codeforge-sandbox-cpp >/dev/null 2>&1; then
+        info "Building C++ sandbox container image (codeforge-sandbox-cpp)..."
+        docker build -t codeforge-sandbox-cpp ./sandbox/cpp
+    else
+        info "Sandbox image 'codeforge-sandbox-cpp' already present."
+    fi
+
     success "Sandbox execution images verified."
 }
 

@@ -51,6 +51,13 @@ class TestCase(Base):
         nullable=False,
         comment="Sort order derived from the label (01 → 1, 02 → 2, ...)",
     )
+    weight: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+        comment="Test case weight for partial credit scoring",
+    )
 
     # ── Relationships ─────────────────────────────────────────────────────────
     problem: Mapped["Problem"] = relationship(  # noqa: F821

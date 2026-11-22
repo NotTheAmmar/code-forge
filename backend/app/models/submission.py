@@ -40,13 +40,25 @@ class Submission(Base):
         index=True,
         comment="Associated lab session if submitted during an active lab",
     )
+    exam_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("exam_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Associated exam session if submitted during an exam",
+    )
     language: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
         default="java",
-        comment="java | python",
+        comment="java | python | c | cpp",
     )
     source_code: Mapped[str] = mapped_column(Text, nullable=False)
+    custom_input: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Student-provided stdin input for run-custom mode",
+    )
     status: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
@@ -96,6 +108,10 @@ class Submission(Base):
     )
     lab_session: Mapped["LabSession | None"] = relationship(  # noqa: F821
         "LabSession",
+        back_populates="submissions",
+    )
+    exam_session: Mapped["ExamSession | None"] = relationship(  # noqa: F821
+        "ExamSession",
         back_populates="submissions",
     )
 

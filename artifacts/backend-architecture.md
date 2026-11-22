@@ -1,36 +1,38 @@
 # CodeForge Backend Architecture
 
-**Version:** 0.5.1 (TA-2 — Phase A1 to A5 complete)
+**Version:** 0.6.0 (Final Jury Milestone — Phase 0 Schema & Foundation Complete)
 
 ## Overview
 
-The CodeForge backend is a **FastAPI** application backed by **PostgreSQL**, with a **Celery** worker that executes Java/Python code in ephemeral **Docker** containers.
+The CodeForge backend is a **FastAPI** application backed by **PostgreSQL**, with a **Celery** worker that executes Java/Python/C/C++ code in ephemeral **Docker** containers.
 
 ```
-Browser ──HTTP──▶ FastAPI (api:8000)
-                       │
-                       │ .delay()
-                       ▼
-                  Celery Worker (worker)
-                       │
-                       │ docker SDK
-                       ▼
-                  Sandbox Container (ephemeral)
-                  codeforge-sandbox-java | codeforge-sandbox-python
+Browser ──HTTP/WS──▶ FastAPI (api:8000)
+                           │
+                           │ .delay()
+                           ▼
+                      Celery Worker (worker)
+                           │
+                           │ docker SDK
+                           ▼
+                      Sandbox Container (ephemeral)
+  codeforge-sandbox-java | codeforge-sandbox-python | codeforge-sandbox-c | codeforge-sandbox-cpp
 ```
 
 ---
 
 ## Implementation Status
 
-| Phase | Description | Status |
+| Milestone Phase | Description | Status |
 |---|---|---|
-| Phase 0 | Schema, migrations, config, sandbox image | ✅ Done |
-| Phase A1 | Auth system (register, login, refresh, me, JWT deps) | ✅ Done |
-| Phase A2 | Course CRUD, problem CRUD, bulk import, gradebook | ✅ Done |
-| Phase A3 | Lab sessions + badge engine | ✅ Done |
-| Phase A4 | Submission history, user profile, security hardening | ✅ Done |
-| Phase A5 | Polish + single-command installer + monitoring | ✅ Done |
+| TA-1 & TA-2 | Core engine, Auth, Courses, Labs, Badges, Gradebook | ✅ Done |
+| Final Jury Phase 0 | Multi-language images (C/C++), DB models, Alembic migration, API contracts | ✅ Done |
+| Final Jury A1 | WebSocket real-time submission updates (Redis Pub/Sub) | 📋 Ready |
+| Final Jury A2 | C/C++ execution & sandbox security hardening | 📋 Ready |
+| Final Jury A3 | Learning modules system (Lessons, Videos, Exercises) | 📋 Ready |
+| Final Jury A4 | Proctored assessment & anti-cheat engine | 📋 Ready |
+| Final Jury A5 | Analytics dashboard & weighted grading | 📋 Ready |
+| Final Jury A6 | Turnkey installer polish & health checks | 📋 Ready |
 
 ---
 
@@ -101,7 +103,8 @@ backend/
 ├── alembic/
 │   ├── env.py                  # Async migration runner
 │   └── versions/
-│       └── 8f615a4a5063_ta2_schema.py  ← Phase 0 migration (applied)
+│       ├── 8f615a4a5063_ta2_schema.py        ← TA-2 schema
+│       └── 20261122_0513_9fdb9d0e7422_final_jury_schema.py ← Final jury schema (applied)
 └── app/
     ├── main.py                 # FastAPI app v0.5.0, CORS, router registration
     ├── config.py               # Pydantic settings (reads .env)
@@ -113,11 +116,17 @@ backend/
     │   ├── user.py             # User (id, email, name, role, password_hash)
     │   ├── course.py           # Course (id, title, created_by, invite_code)
     │   ├── enrollment.py       # Enrollment (user_id, course_id, role)
-    │   ├── problem.py          # Problem (course_id, created_by, slug, test_cases…)
-    │   ├── test_case.py        # TestCase (problem_id, label, input, expected, visible)
-    │   ├── submission.py       # Submission (user_id, problem_id, lab_session_id, score…)
+    │   ├── problem.py          # Problem (course_id, slug, starter_code_c, starter_code_cpp…)
+    │   ├── test_case.py        # TestCase (problem_id, label, input, expected, weight…)
+    │   ├── submission.py       # Submission (user_id, exam_session_id, custom_input…)
     │   ├── lab_session.py      # LabSession + LabSessionProblem
-    │   └── badge.py            # Badge (user_id, lab_session_id, problem_id)
+    │   ├── badge.py            # Badge (user_id, lab_session_id, problem_id)
+    │   ├── learning_module.py  # LearningModule (course_id, title, is_published…)
+    │   ├── learning_content.py # LearningContent (module_id, content_type, body…)
+    │   ├── module_progress.py  # ModuleProgress (user_id, module_id, is_completed…)
+    │   ├── exam.py             # Exam + ExamProblem (duration, anti-cheat flags…)
+    │   ├── exam_session.py     # ExamSession (user_id, exam_id, total_score…)
+    │   └── exam_violation.py   # ExamViolation (violation_type, details…)
     ├── schemas/
     │   ├── __init__.py
     │   ├── auth.py             # RegisterRequest, LoginRequest, TokenResponse, UserResponse
