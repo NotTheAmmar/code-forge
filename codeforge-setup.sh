@@ -322,15 +322,36 @@ print_summary() {
     echo -e "  - ${BOLD}Grafana Dashboard:${NC} http://${host_ip}:3000 (admin / admin)"
     echo -e "  - ${BOLD}Prometheus Metrics:${NC}http://${host_ip}:9090"
     echo ""
-    echo -e "${BOLD}Default User Credentials:${NC}"
-    echo -e "  - ${BOLD}Instructor Account:${NC} admin@codeforge.local / changeme"
-    echo -e "  - ${BOLD}Student Account:${NC}    student@codeforge.local / changeme"
+    echo -e "${BOLD}Default User Credentials (all password: changeme):${NC}"
+    echo -e "  - ${BOLD}Instructor Accounts:${NC}"
+    echo -e "      admin@codeforge.local     (Admin Instructor - CS101, CS201, CS301)"
+    echo -e "      prof.chen@codeforge.local (Prof. Alan Chen - CS201, MATH150)"
+    echo -e "      dr.stone@codeforge.local  (Dr. Elena Stone - CS301 Systems)"
+    echo -e "  - ${BOLD}Student Accounts (12 total):${NC}"
+    echo -e "      student@codeforge.local   (Alex Student - Clean baseline for live demos)"
+    echo -e "      diana@, alice@, bob@, charlie@, evan@, fiona@, george@, hannah@, ian@, julia@, kevin@codeforge.local"
     echo ""
     echo -e "${BOLD}Pre-Loaded Demo Data:${NC}"
-    echo -e "  - ${BOLD}Course:${NC}         CS101: Introduction to Programming (Invite Code: CS101A)"
-    echo -e "  - ${BOLD}Problems:${NC}       hello-world, two-sum, reverse-string, fizzbuzz"
-    echo -e "  - ${BOLD}Active Lab:${NC}     Lab 1: Programming Basics & Warm-up (live badges enabled)"
-    echo -e "  - ${BOLD}Proctored Exam:${NC} CS101 Midterm Proctored Assessment (anti-cheat enabled)"
+    echo -e "  - ${BOLD}Courses (4 total):${NC}"
+    echo -e "      1. CS101: Introduction to Programming (Code: CS101A)"
+    echo -e "      2. CS201: Data Structures & Algorithms (Code: CS201B)"
+    echo -e "      3. CS301: Systems & Low-Level C/C++ Programming (Code: CS301C)"
+    echo -e "      4. MATH150: Discrete Mathematics for CS (Code: M150D)"
+    echo -e "  - ${BOLD}Problems (11 catalog problems):${NC}"
+    echo -e "      hello-world, two-sum, reverse-string, fizzbuzz, palindrome-number,"
+    echo -e "      valid-palindrome, binary-search, merge-sorted-arrays, maximum-subarray,"
+    echo -e "      bitwise-parity, pointer-swap-reverse"
+    echo -e "  - ${BOLD}Labs (4 sessions):${NC}"
+    echo -e "      CS101 Lab 1: Programming Basics & Warm-up (Active, live badges enabled)"
+    echo -e "      CS201 Lab 2: Searching & Pointer Invariants (Active)"
+    echo -e "      CS301 Lab 3: C/C++ Memory & Bitwise Lab (Active)"
+    echo -e "      CS101 Lab 0: Diagnostic Orientation (Closed/Archived)"
+    echo -e "  - ${BOLD}Proctored Exams (4 assessments):${NC}"
+    echo -e "      CS101 Midterm Proctored Assessment (Active, anti-cheat & audit logs seeded)"
+    echo -e "      CS101 Final Assessment: Problem Solving Mastery (Scheduled)"
+    echo -e "      CS201 Midterm: Algorithmic Efficiency & Searching (Active)"
+    echo -e "      CS301 Practical Systems Exam: Memory & Bitwise Ops (Active)"
+    echo -e "  - ${BOLD}Learning Modules (6 curriculum modules with theory & video embeds)${NC}"
     echo ""
     echo -e "${BOLD}Supported Languages:${NC}"
     echo -e "  - Python (3.12), Java (OpenJDK 21), C (GCC 13), C++ (G++ 13, C++20)"
@@ -365,7 +386,7 @@ Commands & Options:
   --reset, reset        Completely wipe all containers and data volumes (-v),
                         re-launch, run migrations, and re-seed clean demo data
   --status, status, ps  Show running container statuses and test API readiness probe
-  --test, test          Run the complete 145-test automated pytest suite
+  --test, test          Run the complete 149-test automated pytest suite
   --seed, seed          Re-seed the database without restarting containers
   --help, -h            Show this help reference
 
@@ -414,7 +435,7 @@ main() {
             banner
             detect_os
             check_prerequisites
-            info "Running complete CodeForge automated test suite (145 tests)..."
+            info "Running complete CodeForge automated test suite (149 tests)..."
             ${COMPOSE_CMD} run --rm api pytest -v
             exit 0
             ;;
