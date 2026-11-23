@@ -9,7 +9,6 @@ import {
   CourseProgressResponse,
 } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import Navbar from '../components/Navbar'
 
 export default function LearnPage() {
   const { courseId } = useParams<{ courseId: string }>()
@@ -63,14 +62,19 @@ export default function LearnPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans transition-colors">
-      <Navbar
-        customTitle={course?.title ? `${course.title} (Curriculum)` : 'Learning Path'}
-        backTo={courseId ? `/courses/${courseId}?tab=learn` : '/'}
-        backLabel="Course"
-      />
-
       {/* Main Content */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+        <div>
+          <Link
+            to={courseId ? `/courses/${courseId}?tab=learn` : '/'}
+            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Course</span>
+          </Link>
+        </div>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <div className="w-8 h-8 rounded-full border-4 border-orange-500/10 border-t-orange-500 animate-spin" />
@@ -86,7 +90,7 @@ export default function LearnPage() {
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
               <div className="flex flex-col gap-1.5">
                 <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                  Course Learning Path
+                  {course?.title ? `${course.title} — Learning Path` : 'Course Learning Path'}
                 </h1>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   Step-by-step interactive theory, video tutorials, and hands-on coding exercises.

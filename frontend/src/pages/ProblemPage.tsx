@@ -20,7 +20,6 @@ import ProblemDescription from '../components/ProblemDescription'
 import AITutorPanel from '../components/AITutorPanel'
 import CodeEditor, { KeybindingMode } from '../components/CodeEditor'
 import TestCasePanel from '../components/TestCasePanel'
-import Navbar from '../components/Navbar'
 import { useWebSocket } from '../hooks/useWebSocket'
 
 // ── Badge Toast ───────────────────────────────────────────────────────────────
@@ -337,28 +336,32 @@ export default function ProblemPage() {
         </div>
       )}
 
-      {/* Header */}
-      <Navbar
-        customTitle={problem?.title || 'Loading...'}
-        backTo={
-          labId
-            ? `/labs/${labId}`
-            : moduleId
-            ? `/modules/${moduleId}`
-            : courseIdParam || problem?.course_id
-            ? `/courses/${courseIdParam || problem?.course_id}?tab=problems`
-            : '/'
-        }
-        backLabel={
-          labId
-            ? 'Lab'
-            : moduleId
-            ? 'Module'
-            : courseIdParam || problem?.course_id
-            ? 'Course'
-            : 'Courses'
-        }
-      />
+      {/* Workspace Top Header */}
+      <div className="h-10 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <Link
+            to={
+              labId
+                ? `/labs/${labId}`
+                : moduleId
+                ? `/modules/${moduleId}`
+                : courseIdParam || problem?.course_id
+                ? `/courses/${courseIdParam || problem?.course_id}?tab=problems`
+                : '/'
+            }
+            className="flex items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>{labId ? 'Lab' : moduleId ? 'Module' : courseIdParam || problem?.course_id ? 'Course' : 'Dashboard'}</span>
+          </Link>
+          <span className="text-zinc-300 dark:text-zinc-700">|</span>
+          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate max-w-sm">
+            {problem?.title || 'Problem Workspace'}
+          </span>
+        </div>
+      </div>
 
       {/* Split Pane Workspace */}
       <div className="flex-1 min-h-0 relative bg-zinc-50 dark:bg-zinc-950">

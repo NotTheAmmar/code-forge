@@ -7,7 +7,6 @@ import {
   LearningModuleDetail,
   LearningContent,
 } from '../api/client'
-import Navbar from '../components/Navbar'
 
 // Helper to convert any YouTube URL into an embed URL
 function getYouTubeEmbedUrl(url: string | null): string | null {
@@ -110,12 +109,21 @@ export default function ModulePage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans transition-colors">
-      {/* Top Bar */}
-      <Navbar
-        customTitle={module.title}
-        backTo={`/courses/${module.course_id}/learn`}
-        backLabel="Curriculum"
-      />
+      {/* Top Header */}
+      <div className="h-10 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 flex items-center justify-between shrink-0">
+        <Link
+          to={`/courses/${module.course_id}/learn`}
+          className="flex items-center gap-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back to Curriculum</span>
+        </Link>
+        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate max-w-sm">
+          {module.title}
+        </span>
+      </div>
 
       {/* Main Two-Column Layout */}
       <div className="flex-1 max-w-7xl w-full mx-auto flex flex-col md:flex-row">

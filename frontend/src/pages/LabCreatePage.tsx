@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getProblems, createLabSession, ProblemSummary } from '../api/client'
-import Navbar from '../components/Navbar'
 
 interface SelectedProblem {
   problem_id: string
@@ -73,14 +72,18 @@ export default function LabCreatePage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col transition-colors duration-200">
-      {/* Header */}
-      <Navbar
-        customTitle="Create Lab Session"
-        backTo={courseId ? `/courses/${courseId}?tab=labs` : '/'}
-        backLabel="Course"
-      />
-
-      <main className="flex-1 max-w-3xl w-full mx-auto px-6 py-8">
+      <main className="flex-1 max-w-3xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+        <div>
+          <Link
+            to={courseId ? `/courses/${courseId}?tab=labs` : '/'}
+            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Course</span>
+          </Link>
+        </div>
         <form onSubmit={handleCreate} className="flex flex-col gap-6">
           {/* Basic info */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 flex flex-col gap-5">

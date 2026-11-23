@@ -24,7 +24,7 @@ param(
     [switch]$Help
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
@@ -69,9 +69,8 @@ function Test-Prerequisites {
     }
 
     # Check Docker daemon
-    try {
-        $null = docker info 2>&1
-    } catch {
+    $null = docker info 2>&1
+    if ($LASTEXITCODE -ne 0) {
         Write-ErrorMsg "Docker Desktop daemon is not responding."
         Write-ErrorMsg "Please ensure Docker Desktop is started and WSL2 / Hyper-V backend is active."
         exit 1
@@ -133,10 +132,14 @@ function Build-Sandboxes($force) {
     )
 
     foreach ($img in $images) {
-        $imgExists = docker image inspect $img.Name 2>&1
-        if ($force -or ($LASTEXITCODE -ne 0)) {
+        $imgId = (docker images -q $img.Name 2>$null)
+        if ($force -or [string]::IsNullOrWhiteSpace($imgId)) {
             Write-Info "Building $($img.Display) sandbox container image ($($img.Name))..."
             docker build -t $img.Name $img.Path
+            if ($LASTEXITCODE -ne 0) {
+                Write-ErrorMsg "Failed to build sandbox image '$($img.Name)'."
+                exit 1
+            }
         } else {
             Write-Info "Sandbox image '$($img.Name)' already present."
         }
@@ -156,7 +159,7 @@ function Test-Sandboxes {
     )
 
     foreach ($t in $tests) {
-        $null = docker run --rm --network none $t.Img sh -c $t.Cmd 2>&1
+        $null = docker run --rm --network none $t.Img sh -c "$($t.Cmd) >/dev/null 2>&1"
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  ✔ $($t.Name) sandbox operational" -ForegroundColor Green
         } else {

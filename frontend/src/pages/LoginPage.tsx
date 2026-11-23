@@ -33,9 +33,15 @@ export default function LoginPage() {
         }
         navigate(redirectTo, { replace: true })
       } catch (err: unknown) {
-        const msg =
-          (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-          'Something went wrong. Please try again.'
+        const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail
+        let msg = 'Something went wrong. Please try again.'
+        if (typeof detail === 'string') {
+          msg = detail
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          msg = detail.map((d: { msg?: string }) => d.msg || JSON.stringify(d)).join(', ')
+        } else if ((err as Error)?.message) {
+          msg = (err as Error).message
+        }
         setError(msg)
       } finally {
         setLoading(false)

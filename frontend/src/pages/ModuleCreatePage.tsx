@@ -6,7 +6,6 @@ import {
   getCourseProblems,
   ProblemSummary,
 } from '../api/client'
-import Navbar from '../components/Navbar'
 
 interface DraftContent {
   id: string
@@ -118,15 +117,19 @@ export default function ModuleCreatePage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans transition-colors">
-      {/* Header */}
-      <Navbar
-        customTitle="Create Learning Module"
-        backTo={`/courses/${courseId}/learn`}
-        backLabel="Curriculum"
-      />
-
       {/* Main Form */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-8">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+        <div>
+          <Link
+            to={`/courses/${courseId}/learn`}
+            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Curriculum</span>
+          </Link>
+        </div>
         <form onSubmit={handleSave} className="flex flex-col gap-6">
           {error && (
             <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-semibold">

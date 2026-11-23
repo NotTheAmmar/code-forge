@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getLabSession, getMyLabProgress, LabSessionDetail, MyLabProgress } from '../api/client'
-import Navbar from '../components/Navbar'
 
 export default function StudentLabPage() {
   const { id } = useParams<{ id: string }>()
@@ -72,14 +71,18 @@ export default function StudentLabPage() {
         </div>
       </div>
 
-      {/* Header */}
-      <Navbar
-        customTitle={lab.title}
-        backTo={`/courses/${lab.course_id}?tab=labs`}
-        backLabel="Course"
-      />
-
       <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+        <div>
+          <Link
+            to={`/courses/${lab.course_id}?tab=labs`}
+            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Course</span>
+          </Link>
+        </div>
         {/* Progress Overview */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">

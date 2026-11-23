@@ -17,7 +17,6 @@ import {
   TestCaseInput,
 } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import Navbar from '../components/Navbar'
 
 type Tab = 'problems' | 'learn' | 'labs' | 'exams' | 'gradebook' | 'analytics'
 const VALID_TABS: Tab[] = ['problems', 'learn', 'labs', 'exams', 'gradebook', 'analytics']
@@ -260,9 +259,18 @@ export default function CoursePage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col transition-colors duration-200">
-      <Navbar customTitle={course.title} backTo="/" backLabel="Courses" />
-
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+        <div>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Courses</span>
+          </Link>
+        </div>
         {/* Course header card */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-orange-500/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/4" />

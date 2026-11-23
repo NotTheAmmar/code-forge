@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { getCourse, getGradebook, CourseResponse, GradebookRow } from '../api/client'
-import Navbar from '../components/Navbar'
 
 type SortKey = 'name' | 'badges' | 'mandatory'
 type SortDir = 'asc' | 'desc'
@@ -57,14 +56,18 @@ export default function GradebookPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col transition-colors duration-200">
-      {/* Header */}
-      <Navbar
-        customTitle="Gradebook"
-        backTo={courseId ? `/courses/${courseId}?tab=gradebook` : '/'}
-        backLabel="Course"
-      />
-
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+        <div>
+          <Link
+            to={courseId ? `/courses/${courseId}?tab=gradebook` : '/'}
+            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Course</span>
+          </Link>
+        </div>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Gradebook</h1>

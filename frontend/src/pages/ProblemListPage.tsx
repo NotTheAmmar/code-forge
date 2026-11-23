@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getProblems, ProblemSummary } from '../api/client'
-import Navbar from '../components/Navbar'
 
 export default function ProblemListPage() {
   const [problems, setProblems] = useState<ProblemSummary[]>([])
@@ -38,11 +37,19 @@ export default function ProblemListPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans flex flex-col transition-colors duration-200">
-      {/* Header / Navbar */}
-      <Navbar customTitle="Practice Challenges" backTo="/" backLabel="Courses" />
-
       {/* Main Container */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-10 flex flex-col gap-8">
+        <div>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span>Back to Courses</span>
+          </Link>
+        </div>
         {/* Intro Hero Section */}
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight md:text-4xl">
